@@ -1,0 +1,64 @@
+import std/[json, os, strutils]
+import ./[chunk_split, types]
+
+proc parseChunkBody*(source: string; ordinal: int; body: string): InputChunk =
+  let lines = body.splitLines()
+  result = InputChunk(
+    source: source,
+    ordinal: ordinal,
+    text: body.strip(),
+    hasPage: false,
+    page: 0,
+    section: "",
+    metadataJson: ""
+  )
+
+  if lines.len < 3:
+    return
+  if lines[1].strip().len != 0:
+    return
+
+  let headerText = lines[0].strip()
+  if headerText.len == 0 or headerText[0] != '{':
+    return
+
+  try:
+    let node = parseJson(headerText)
+    if node.kind != JObject:
+      return
+
+    var textLines: seq[string]
+    for i in 2 ..< lines.len:
+      textLines.add(lines[i])
+
+    let parsedText = textLines.join("\n").strip()
+    if parsedText.len == 0:
+      return
+
+    result.text = parsedText
+    result.metadataJson = headerText
+
+    if node.hasKey("page") and node["page"].kind == JInt:
+      result.hasPage = true
+      result.page = node["page"].getInt()
+    if node.hasKey("section") and node["section"].kind == JString:
+      result.section = node["section"].getStr()
+  except CatchableError:
+    discard
+
+proc parseInputChunks*(source, text, marker: string): seq[InputChunk] =
+  let pieces = splitChunks(text, marker)
+  for i in 0 ..< pieces.len:
+    result.add(parseChunkBody(source, i + 1, pieces[i]))
+
+proc readInputText*(path: string): tuple[source, text: string] =
+  if path == "-":
+    result = (source: "stdin", text: stdin.readAll())
+  else:
+    if not fileExists(path):
+      raise newException(ValueError, "input file does not exist: " & path)
+    result = (source: path, text: readFile(path))
+
+proc loadInputChunks*(path, marker: string): seq[InputChunk] =
+  let loaded = readInputText(path)
+  result = parseInputChunks(loaded.source, loaded.text, marker)

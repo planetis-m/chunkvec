@@ -1,0 +1,7 @@
+*.sqlite
+*.db
+*.opus
+*.wav
+src/chunkvec_ingest
+src/chunkvec_search
+nimcache/
