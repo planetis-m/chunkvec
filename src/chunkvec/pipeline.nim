@@ -2,7 +2,7 @@ import std/[monotimes, os, random, times]
 import relay
 import openai, openai_embeddings, openai_retry
 import ./[embeddings_client, request_id_codec, retry_and_errors, retry_queue,
-  sqlite_wrap, types, vector_blob]
+  chunk_store, types, vector_blob]
 
 const
   RetryPollSliceMs = 25
@@ -57,7 +57,7 @@ proc initPipelineState(total: int): PipelineState =
     rng: initRand(getMonoTime().ticks)
   )
 
-proc flushOrderedResults(db: Database; insertStmt: Statement; cfg: RuntimeConfig;
+proc flushOrderedResults(db: DbConn; insertStmt: SqlPrepared; cfg: RuntimeConfig;
     state: var PipelineState; dbMeta: var DbMetadata) =
   while state.nextFinalizeSeqId < state.staged.len and
       state.staged[state.nextFinalizeSeqId].status != ChunkPending:
@@ -219,7 +219,7 @@ proc waitForProgress(cfg: RuntimeConfig; chunks: seq[InputChunk]; client: Relay;
       sleep(min(RetryPollSliceMs, nextRetryMs))
 
 proc runPipeline*(cfg: RuntimeConfig; chunks: seq[InputChunk]; client: Relay;
-    db: Database; insertStmt: Statement; dbMeta: var DbMetadata): tuple[
+    db: DbConn; insertStmt: SqlPrepared; dbMeta: var DbMetadata): tuple[
       allSucceeded: bool,
       insertedCount: int
     ] =

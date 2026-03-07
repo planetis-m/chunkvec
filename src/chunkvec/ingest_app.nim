@@ -1,6 +1,6 @@
 import std/os
 import relay
-import ./[constants, input_chunks, logging, pipeline, runtime_config, sqlite_wrap,
+import ./[constants, chunk_store, input_chunks, logging, pipeline, runtime_config,
   types]
 
 proc shutdownRelay(client: Relay; shouldAbort: bool) =
@@ -12,7 +12,7 @@ proc shutdownRelay(client: Relay; shouldAbort: bool) =
 proc runIngestApp*(): int =
   var client: Relay = nil
   var shouldAbort = false
-  var db: Database
+  var db: DbConn
   var dbOpened = false
   var transactionOpen = false
 

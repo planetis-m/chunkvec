@@ -38,7 +38,7 @@ type
 
   ChunkRecord* = object
     chunk*: InputChunk
-    embeddingBlob*: string
+    embeddingBlob*: seq[byte]
     dimension*: int
 
   ChunkErrorKind* = enum

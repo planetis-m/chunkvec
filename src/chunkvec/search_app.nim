@@ -1,7 +1,7 @@
 import std/[os, strutils]
 import relay
 import openai, openai_embeddings
-import ./[constants, embeddings_client, logging, runtime_config, sqlite_wrap,
+import ./[chunk_store, constants, embeddings_client, logging, runtime_config,
   types, vector_blob]
 
 proc shutdownRelay(client: Relay; shouldAbort: bool) =
@@ -31,7 +31,7 @@ proc renderResult(row: SearchResult; rank: int) =
 proc runSearchApp*(): int =
   var client: Relay = nil
   var shouldAbort = false
-  var db: Database
+  var db: DbConn
   var dbOpened = false
 
   try:

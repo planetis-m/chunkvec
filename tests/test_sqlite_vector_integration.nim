@@ -1,5 +1,5 @@
 import std/os
-import ../src/chunkvec/[sqlite_vector_paths, sqlite_wrap, types, vector_blob]
+import ../src/chunkvec/[chunk_store, sqlite_vector_paths, types, vector_blob]
 
 proc testSqliteVectorRoundTrip() =
   let repoRoot = getCurrentDir()
