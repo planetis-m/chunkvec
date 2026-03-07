@@ -1,8 +1,8 @@
 import std/[os, strutils]
 import relay
-import openai, openai_embeddings
+import openai/[core, embeddings]
 import ./[chunk_store, constants, embeddings_client, logging, runtime_config,
-  types, vector_blob]
+  types]
 
 proc shutdownRelay(client: Relay; shouldAbort: bool) =
   if shouldAbort:
@@ -73,7 +73,6 @@ proc runSearchApp*(): int =
       raise newException(ValueError, "embeddings response had no vectors")
 
     let queryVector = embedding(parsed)
-    let queryBlob = floatsToBlob(queryVector)
 
     db = openDatabase(cli.dbPath)
     dbOpened = true
@@ -84,7 +83,7 @@ proc runSearchApp*(): int =
     requireSearchReady(meta, cfg.networkConfig.model, queryVector.len)
     db.initializeVectorTable(meta)
 
-    let rows = db.searchChunks(queryBlob, cfg.networkConfig.topK)
+    let rows = db.searchChunks(queryVector, cfg.networkConfig.topK)
     for i in 0 ..< rows.len:
       renderResult(rows[i], i + 1)
 

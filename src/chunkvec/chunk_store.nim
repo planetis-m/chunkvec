@@ -4,6 +4,11 @@ import ./[constants, logging, types]
 
 export db_sqlite
 
+proc packFloat32Blob(values: openArray[float32]): seq[byte] =
+  result = newSeq[byte](values.len * sizeof(float32))
+  if result.len > 0:
+    copyMem(addr result[0], unsafeAddr values[0], result.len)
+
 when defined(windows):
   when defined(nimOldDlls):
     const SqliteDynlib = "sqlite3.dll"
@@ -220,7 +225,7 @@ proc insertChunk*(db: DbConn; stmt: SqlPrepared; record: ChunkRecord) =
     stmt.bindParam(1, record.chunk.source)
     stmt.bindParam(2, record.chunk.ordinal)
     stmt.bindParam(3, record.chunk.text)
-    stmt.bindParam(4, record.embeddingBlob)
+    stmt.bindParam(4, packFloat32Blob(record.embedding))
 
     if record.chunk.hasPage:
       stmt.bindParam(5, record.chunk.page)
@@ -266,7 +271,7 @@ proc rowCount*(db: DbConn): int =
   except CatchableError:
     raise raiseIoError("failed to count chunk rows")
 
-proc runSearch(db: DbConn; scanProc: string; queryBlob: openArray[byte];
+proc runSearch(db: DbConn; scanProc: string; queryVector: openArray[float32];
     topK: int): seq[SearchResult] =
   let query = fmt"""
 SELECT
@@ -286,7 +291,7 @@ ORDER BY v.distance ASC, c.id ASC;
   var stmt: SqlPrepared
   try:
     stmt = db.prepare(query)
-    stmt.bindParam(1, queryBlob)
+    stmt.bindParam(1, packFloat32Blob(queryVector))
     stmt.bindParam(2, topK)
 
     for row in db.instantRows(stmt):
@@ -315,15 +320,15 @@ ORDER BY v.distance ASC, c.id ASC;
     if not stmt.isNil:
       stmt.finalize()
 
-proc searchChunks*(db: DbConn; queryBlob: openArray[byte];
+proc searchChunks*(db: DbConn; queryVector: openArray[float32];
     topK: int): seq[SearchResult] =
   try:
-    result = db.runSearch("vector_quantize_scan", queryBlob, topK)
+    result = db.runSearch("vector_quantize_scan", queryVector, topK)
   except CatchableError:
     let message = getCurrentExceptionMsg()
     if message.toLowerAscii().contains("vector_quantize") or
         message.toLowerAscii().contains("quantization"):
       logWarn("quantized search unavailable; falling back to full scan")
-      result = db.runSearch("vector_full_scan", queryBlob, topK)
+      result = db.runSearch("vector_full_scan", queryVector, topK)
     else:
       raise

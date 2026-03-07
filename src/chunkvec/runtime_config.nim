@@ -1,6 +1,6 @@
 import std/[envvars, files, os, parseopt, paths, strutils]
 import jsonx
-import openai
+import openai/core
 import ./[constants, logging, types]
 import ./sqlite_vector_paths
 

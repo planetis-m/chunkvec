@@ -1,3 +1,5 @@
+import openai/embeddings
+
 const
   DefaultConfigPath* = "config.json"
 
@@ -8,7 +10,7 @@ const
   TotalTimeoutMs* = 120_000
   MaxRetries* = 5
   TopK* = 8
-  EncodingFormat* = "float"
+  EncodingFormat* = EmbeddingEncodingFormat.`float`
   DistanceMetric* = "COSINE"
   QuantizationType* = "UINT8"
 

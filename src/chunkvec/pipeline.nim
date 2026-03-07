@@ -1,8 +1,8 @@
 import std/[monotimes, os, random, times]
 import relay
-import openai, openai_embeddings, openai_retry
+import openai/[core, embeddings, retry]
 import ./[embeddings_client, request_id_codec, retry_and_errors, retry_queue,
-  chunk_store, types, vector_blob]
+  chunk_store, types]
 
 const
   RetryPollSliceMs = 25
@@ -153,7 +153,7 @@ proc processEmbeddingSuccess(chunks: seq[InputChunk]; seqId, attempt: int; body:
     else:
       state.records[seqId] = ChunkRecord(
         chunk: chunks[seqId],
-        embeddingBlob: floatsToBlob(values),
+        embedding: @values,
         dimension: values.len
       )
       state.staged[seqId] = okChunkResult(attempt)

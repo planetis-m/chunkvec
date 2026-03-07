@@ -1,4 +1,4 @@
-import openai_embeddings
+import openai/embeddings
 import ./[constants, types]
 
 proc buildEmbeddingParams*(cfg: RuntimeConfig; text: sink string): EmbeddingCreateParams =

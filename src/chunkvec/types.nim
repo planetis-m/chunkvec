@@ -1,4 +1,4 @@
-import openai
+import openai/core
 
 type
   NetworkConfig* = object
@@ -38,7 +38,7 @@ type
 
   ChunkRecord* = object
     chunk*: InputChunk
-    embeddingBlob*: seq[byte]
+    embedding*: seq[float32]
     dimension*: int
 
   ChunkErrorKind* = enum

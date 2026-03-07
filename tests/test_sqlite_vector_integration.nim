@@ -1,5 +1,5 @@
 import std/os
-import ../src/chunkvec/[chunk_store, sqlite_vector_paths, types, vector_blob]
+import ../src/chunkvec/[chunk_store, sqlite_vector_paths, types]
 
 proc testSqliteVectorRoundTrip() =
   let repoRoot = getCurrentDir()
@@ -35,7 +35,7 @@ proc testSqliteVectorRoundTrip() =
       section: "Intro",
       metadataJson: "{\"page\":7,\"section\":\"Intro\"}"
     ),
-    embeddingBlob: floatsToBlob([1.0, 0.0, 0.0]),
+    embedding: @[1.0'f32, 0.0'f32, 0.0'f32],
     dimension: 3
   ))
   db.insertChunk(stmt, ChunkRecord(
@@ -48,13 +48,13 @@ proc testSqliteVectorRoundTrip() =
       section: "",
       metadataJson: ""
     ),
-    embeddingBlob: floatsToBlob([0.0, 1.0, 0.0]),
+    embedding: @[0.0'f32, 1.0'f32, 0.0'f32],
     dimension: 3
   ))
   db.commitTransaction()
   db.rebuildQuantization(meta)
 
-  let rows = db.searchChunks(floatsToBlob([1.0, 0.0, 0.0]), 1)
+  let rows = db.searchChunks([1.0'f32, 0.0'f32, 0.0'f32], 1)
   doAssert rows.len == 1
   doAssert rows[0].text == "alpha"
   doAssert rows[0].hasPage
