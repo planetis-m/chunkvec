@@ -1,13 +1,10 @@
-{.passC: "-I/home/ageralis/chunkvec/third_party/sqlite".}
-{.passL: "/lib64/libsqlite3.so.0".}
-
 import std/os
-import ../src/chunkvec/[sqlite_wrap, types, vector_blob]
+import ../src/chunkvec/[sqlite_vector_paths, sqlite_wrap, types, vector_blob]
 
 proc testSqliteVectorRoundTrip() =
   let repoRoot = getCurrentDir()
   let dbPath = repoRoot / "test_files" / "vector_test.sqlite"
-  let extensionPath = repoRoot / "third_party" / "sqlite" / "vector.so"
+  let extensionPath = repoRoot / defaultSqliteVectorExtensionRelativePath()
   if fileExists(dbPath):
     removeFile(dbPath)
 

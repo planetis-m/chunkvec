@@ -1,0 +1,258 @@
+name: Release Build
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+env:
+  VERSION: ${{ github.ref_name }}
+  SQLITE_VECTOR_VERSION: 0.9.92
+
+jobs:
+  build-linux:
+    name: Build Linux (x86_64)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install Nim
+        uses: jiro4989/setup-nim-action@v2
+        with:
+          nim-version: stable
+          repo-token: ${{ github.token }}
+
+      - name: Install Atlas via Nimble
+        run: nimble install -y "https://github.com/nim-lang/atlas@#head"
+
+      - name: Install Nim dependencies
+        run: atlas install
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libcurl4-openssl-dev libsqlite3-dev
+
+      - name: Download SQLite Vector
+        run: |
+          mkdir -p third_party/sqlite
+          curl -L \
+            "https://github.com/sqliteai/sqlite-vector/releases/download/v${{ env.SQLITE_VECTOR_VERSION }}/vector-linux-x86_64-${{ env.SQLITE_VECTOR_VERSION }}.tar.gz" \
+            -o vector-linux-x86_64.tar.gz
+          tar -xf vector-linux-x86_64.tar.gz -C third_party/sqlite
+          candidate="$(find third_party/sqlite -type f -name 'vector.so' | head -n 1)"
+          test -n "$candidate"
+          if [ "$candidate" != "third_party/sqlite/vector.so" ]; then
+            mv "$candidate" third_party/sqlite/vector.so
+          fi
+
+      - name: Build release binaries
+        run: |
+          nim c -d:release -o:chunkvec_ingest src/chunkvec_ingest.nim
+          nim c -d:release -o:chunkvec_search src/chunkvec_search.nim
+
+      - name: Strip executables
+        run: strip chunkvec_ingest chunkvec_search
+
+      - name: Create archive
+        run: |
+          mkdir -p dist/third_party/sqlite
+          cp chunkvec_ingest dist/
+          cp chunkvec_search dist/
+          cp config.json dist/
+          cp README.md dist/
+          cp third_party/sqlite/vector.so dist/third_party/sqlite/
+          tar -czf chunkvec-linux-x86_64.tar.gz -C dist .
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: chunkvec-linux-x86_64-${{ env.VERSION }}
+          path: chunkvec-linux-x86_64.tar.gz
+          if-no-files-found: error
+
+  build-macos:
+    name: Build macOS (arm64)
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install Nim
+        uses: jiro4989/setup-nim-action@v2
+        with:
+          nim-version: stable
+          repo-token: ${{ github.token }}
+
+      - name: Install Atlas via Nimble
+        run: nimble install -y "https://github.com/nim-lang/atlas@#head"
+
+      - name: Install Nim dependencies
+        run: atlas install
+
+      - name: Install build dependencies
+        run: brew install curl
+
+      - name: Download SQLite Vector
+        run: |
+          mkdir -p third_party/sqlite
+          curl -L \
+            "https://github.com/sqliteai/sqlite-vector/releases/download/v${{ env.SQLITE_VECTOR_VERSION }}/vector-macos-${{ env.SQLITE_VECTOR_VERSION }}.tar.gz" \
+            -o vector-macos.tar.gz
+          tar -xf vector-macos.tar.gz -C third_party/sqlite
+          candidate="$(find third_party/sqlite -type f -name 'vector.dylib' | head -n 1)"
+          test -n "$candidate"
+          if [ "$candidate" != "third_party/sqlite/vector.dylib" ]; then
+            mv "$candidate" third_party/sqlite/vector.dylib
+          fi
+
+      - name: Build release binaries
+        run: |
+          nim c -d:release -o:chunkvec_ingest src/chunkvec_ingest.nim
+          nim c -d:release -o:chunkvec_search src/chunkvec_search.nim
+
+      - name: Create archive
+        run: |
+          mkdir -p dist/third_party/sqlite
+          cp chunkvec_ingest dist/
+          cp chunkvec_search dist/
+          cp config.json dist/
+          cp README.md dist/
+          cp third_party/sqlite/vector.dylib dist/third_party/sqlite/
+          tar -czf chunkvec-macos-arm64.tar.gz -C dist .
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: chunkvec-macos-arm64-${{ env.VERSION }}
+          path: chunkvec-macos-arm64.tar.gz
+          if-no-files-found: error
+
+  build-windows:
+    name: Build Windows (x86_64)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install Nim
+        uses: jiro4989/setup-nim-action@v2
+        with:
+          nim-version: stable
+          repo-token: ${{ github.token }}
+
+      - name: Install Atlas via Nimble
+        run: nimble install -y "https://github.com/nim-lang/atlas@#head"
+
+      - name: Install Nim dependencies
+        run: atlas install
+
+      - name: Install build dependencies
+        uses: johnwason/vcpkg-action@v7
+        id: vcpkg
+        with:
+          pkgs: curl[http2,ssl,c-ares] sqlite3
+          triplet: x64-windows-release
+          token: ${{ github.token }}
+
+      - name: Download SQLite Vector
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path third_party/sqlite | Out-Null
+          curl.exe -L `
+            "https://github.com/sqliteai/sqlite-vector/releases/download/v${{ env.SQLITE_VECTOR_VERSION }}/vector-windows-x86_64-${{ env.SQLITE_VECTOR_VERSION }}.zip" `
+            -o vector-windows-x86_64.zip
+          Expand-Archive -Path vector-windows-x86_64.zip -DestinationPath third_party/sqlite -Force
+          $candidate = Get-ChildItem -Path third_party/sqlite -Recurse -Filter vector.dll |
+            Select-Object -First 1
+          if ($null -eq $candidate) {
+            throw "vector.dll not found in archive"
+          }
+          $expected = Join-Path $pwd "third_party/sqlite/vector.dll"
+          if ($candidate.FullName -ne $expected) {
+            Move-Item $candidate.FullName $expected -Force
+          }
+
+      - name: Build release binaries
+        shell: pwsh
+        env:
+          VCPKG_ROOT: ${{ github.workspace }}\vcpkg\installed\x64-windows-release
+        run: |
+          nim c -d:release -o:chunkvec_ingest.exe src/chunkvec_ingest.nim
+          nim c -d:release -o:chunkvec_search.exe src/chunkvec_search.nim
+
+      - name: Create archive
+        shell: pwsh
+        env:
+          VCPKG_ROOT: ${{ github.workspace }}\vcpkg\installed\x64-windows-release
+        run: |
+          New-Item -ItemType Directory -Force -Path dist\third_party\sqlite | Out-Null
+          Copy-Item chunkvec_ingest.exe dist\
+          Copy-Item chunkvec_search.exe dist\
+          Copy-Item config.json dist\
+          Copy-Item README.md dist\
+          Copy-Item third_party\sqlite\vector.dll dist\third_party\sqlite\
+          Copy-Item "$env:VCPKG_ROOT\\bin\\*.dll" dist\ -ErrorAction Stop
+          Compress-Archive -Path dist\* -DestinationPath chunkvec-windows-x86_64.zip -Force
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: chunkvec-windows-x86_64-${{ env.VERSION }}
+          path: chunkvec-windows-x86_64.zip
+          if-no-files-found: error
+
+  create-release:
+    name: Create Release
+    needs:
+      - build-linux
+      - build-macos
+      - build-windows
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v5
+        with:
+          path: artifacts
+
+      - name: Gather release files
+        run: |
+          mkdir -p artifacts/release
+          find artifacts -type f \( -name "*.zip" -o -name "*.tar.gz" \) -exec cp {} artifacts/release/ \;
+          ls -la artifacts/release/
+
+      - name: Create release notes
+        run: |
+          cat > release-notes.md << EOF
+          ## Release ${{ env.VERSION }}
+
+          Prebuilt binaries for:
+
+          - Linux x86_64: chunkvec-linux-x86_64.tar.gz
+          - macOS arm64: chunkvec-macos-arm64.tar.gz
+          - Windows x86_64: chunkvec-windows-x86_64.zip
+
+          Each archive includes the chunkvec_ingest and chunkvec_search executables,
+          config.json, README.md, and the SQLite Vector runtime under third_party/sqlite/.
+          The Windows archive also includes the required runtime DLLs from vcpkg.
+          EOF
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.VERSION }}
+          name: Release ${{ env.VERSION }}
+          body_path: release-notes.md
+          files: artifacts/release/*
+          draft: true
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

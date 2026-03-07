@@ -1,8 +1,8 @@
 import std/[envvars, files, os, parseopt, paths, strutils]
-from std/os import getAppDir
 import jsonx
 import openai
 import ./[constants, logging, types]
+import ./sqlite_vector_paths
 
 {.define: jsonxLenient.}
 
@@ -47,12 +47,12 @@ proc defaultJsonRuntimeConfig(): JsonRuntimeConfig =
     max_inflight: MaxInflight,
     max_retries: MaxRetries,
     total_timeout_ms: TotalTimeoutMs,
-    vector_extension_path: "third_party/sqlite/vector.so",
+    vector_extension_path: defaultSqliteVectorExtensionRelativePath(),
     top_k: TopK
   )
 
 proc resolveAppBaseDir(): string =
-  let appDir = getAppDir()
+  let appDir = os.getAppDir()
   let repoConfigPath = appDir.parentDir / DefaultConfigPath
   if fileExists(appDir / DefaultConfigPath):
     result = appDir
@@ -81,12 +81,15 @@ proc resolveApiKey(configApiKey: string): string =
     result = configApiKey
 
 proc resolveExtensionPath(baseDir, rawPath: string): string =
-  if rawPath.len == 0:
-    result = baseDir / "third_party/sqlite/vector.so"
-  elif rawPath.isAbsolute:
-    result = rawPath
-  else:
-    result = baseDir / rawPath
+  let resolvedPath =
+    if rawPath.len == 0:
+      baseDir / defaultSqliteVectorExtensionRelativePath()
+    elif rawPath.isAbsolute:
+      rawPath
+    else:
+      baseDir / rawPath
+
+  result = normalizeSqliteVectorExtensionPath(resolvedPath)
 
 template ifNonEmpty(value, fallback: untyped): untyped =
   if value.len > 0: value

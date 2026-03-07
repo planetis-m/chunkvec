@@ -6,6 +6,6 @@
   "max_inflight": 32,
   "max_retries": 5,
   "total_timeout_ms": 120000,
-  "vector_extension_path": "third_party/sqlite/vector.so",
+  "vector_extension_path": "third_party/sqlite/vector",
   "top_k": 8
 }
