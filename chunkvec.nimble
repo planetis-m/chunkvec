@@ -1,6 +1,6 @@
 version       = "0.1.0"
 author        = "planetis"
-description   = "Store and retrieve embeddings for pre-chunked study text using DeepInfra and SQLite Vector"
+description   = "Store and search embeddings for pre-chunked text with SQLite vector search"
 license       = "AGPL-3.0"
 srcDir        = "src"
 bin           = @["chunkvec_ingest", "chunkvec_search"]
