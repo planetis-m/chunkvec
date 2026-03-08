@@ -160,7 +160,10 @@ proc initializeVectorTable*(db: DbConn; meta: DbMetadata) =
 
   let options = fmt"type=FLOAT32,dimension={meta.dimension},distance={meta.distance}"
   discard db.getValue(
-    sql(fmt"SELECT vector_init('{TableName}', '{EmbeddingColumn}', '{options}');")
+    sql"SELECT vector_init(?, ?, ?);",
+    TableName,
+    EmbeddingColumn,
+    options
   )
 
 proc configuredMetadata*(model: string; dimension: int): DbMetadata =
@@ -226,11 +229,17 @@ proc rebuildQuantization*(db: DbConn; meta: DbMetadata) =
   if not meta.initialized:
     return
 
+  let options = "qtype=" & meta.qtype
   discard db.getValue(
-    sql(fmt"SELECT vector_quantize('{TableName}', '{EmbeddingColumn}', 'qtype={meta.qtype}');")
+    sql"SELECT vector_quantize(?, ?, ?);",
+    TableName,
+    EmbeddingColumn,
+    options
   )
   discard db.getValue(
-    sql(fmt"SELECT vector_quantize_preload('{TableName}', '{EmbeddingColumn}');")
+    sql"SELECT vector_quantize_preload(?, ?);",
+    TableName,
+    EmbeddingColumn
   )
 
 proc rowCount*(db: DbConn): int =
