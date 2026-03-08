@@ -145,7 +145,7 @@ proc insertChunk*(db: DbConn; stmt: SqlPrepared; record: ChunkRecord) =
   else:
     stmt.bindNull(7)
 
-  if sqlite3.step(sqlite3.PStmt(stmt)) != SQLITE_DONE:
+  if not db.tryExec(stmt):
     raise db.sqliteError("failed to insert chunk row")
 
 proc rebuildQuantization*(db: DbConn) =
