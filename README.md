@@ -201,6 +201,14 @@ Prepare a query:
 How do embeddings help search?
 ```
 
+Filtered query example:
+
+```text
+<search page=5 section="vector_search">
+
+How do embeddings help search?
+```
+
 Set your API key:
 
 ```bash
@@ -218,6 +226,20 @@ Search:
 ```bash
 ./chunkvec_search query.txt notes.sqlite
 ```
+
+`chunkvec_search` accepts either:
+
+- a plain query file containing only the semantic query text
+- or an optional leading `<search ...>` header followed by a blank line and the
+  query text
+
+Search filter rules:
+
+- `page` is an exact single-page filter
+- `section` is a substring filter after `strutils.normalize` on both sides
+- `strutils.normalize` lowercases ASCII and removes `_`
+- if both filters are present, both must match
+- query text is still required even when filters are present
 
 Typical output:
 

@@ -5,6 +5,15 @@ type
     pageNumber*: int
     section*: string
 
+  SearchFilters* = object
+    hasPageNumber*: bool
+    pageNumber*: int
+    sectionSubstring*: string
+
+  SearchInput* = object
+    queryText*: string
+    filters*: SearchFilters
+
   NetworkConfig* = object
     maxInflight*: int
     totalTimeoutMs*: int
@@ -59,3 +68,6 @@ type
     ordinal*: int
     text*: string
     metadata*: ChunkMetadata
+
+proc hasFilters*(filters: SearchFilters): bool {.inline.} =
+  result = filters.hasPageNumber or filters.sectionSubstring.len > 0

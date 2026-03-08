@@ -112,7 +112,20 @@ proc rebuildQuantization*(db: DbConn) =
 proc rowCount*(db: DbConn): int =
   result = parseInt(db.getValue(sql("SELECT COUNT(*) FROM " & TableName & ";")))
 
-proc runSearch(db: DbConn; scanProc: string; queryVector: seq[float32];
+proc readSearchResult(row: InstantRow): SearchResult =
+  result = SearchResult(
+    id: sqlite3.column_int64(row, 0),
+    distance: sqlite3.column_double(row, 1).float,
+    source: row.textColumn(2),
+    ordinal: sqlite3.column_int(row, 3).int,
+    text: row.textColumn(4),
+    metadata: ChunkMetadata(
+      pageNumber: sqlite3.column_int(row, 5).int,
+      section: row.textColumn(6)
+    )
+  )
+
+proc runTopKSearch(db: DbConn; scanProc: string; queryVector: seq[float32];
     topK: int): seq[SearchResult] =
   let query =
     """SELECT
@@ -137,23 +150,68 @@ ORDER BY v.distance ASC, c.id ASC;
     stmt.bindParam(2, topK)
 
     for row in db.instantRows(stmt):
-      var resultRow = SearchResult(
-        id: sqlite3.column_int64(row, 0),
-        distance: sqlite3.column_double(row, 1).float,
-        source: row.textColumn(2),
-        ordinal: sqlite3.column_int(row, 3).int,
-        text: row.textColumn(4),
-        metadata: ChunkMetadata(
-          pageNumber: sqlite3.column_int(row, 5).int,
-          section: row.textColumn(6)
-        )
-      )
-
-      result.add(resultRow)
+      result.add(readSearchResult(row))
   finally:
     if not stmt.isNil:
       stmt.finalize()
 
-proc searchChunks*(db: DbConn; queryVector: seq[float32];
-    topK: int): seq[SearchResult] =
-  result = db.runSearch("vector_quantize_scan", queryVector, topK)
+proc normalizedSectionExpr(column: string): string =
+  result = "lower(replace(" & column & ", '_', ''))"
+
+proc runFilteredSearch(db: DbConn; queryVector: seq[float32];
+    filters: SearchFilters; topK: int): seq[SearchResult] =
+  var query =
+    """SELECT
+  c.id,
+  v.distance,
+  c.source,
+  c.ordinal,
+  c.text,
+  c.page_number,
+  c.section
+FROM """ & TableName & """ AS c
+JOIN vector_quantize_scan('""" & TableName & """', '""" &
+    EmbeddingColumn & """', ?) AS v
+  ON c.id = v.rowid
+"""
+
+  var conditions: seq[string]
+  if filters.hasPageNumber:
+    conditions.add("c.page_number = ?")
+  if filters.sectionSubstring.len > 0:
+    conditions.add("instr(" & normalizedSectionExpr("c.section") & ", ?) > 0")
+
+  if conditions.len > 0:
+    query.add("WHERE " & conditions.join(" AND ") & "\n")
+
+  query.add("ORDER BY v.distance ASC, c.id ASC\n")
+  query.add("LIMIT ?;")
+
+  let normalizedSection = filters.sectionSubstring.normalize()
+
+  var stmt: SqlPrepared
+  try:
+    stmt = db.prepare(query)
+    var paramIdx = 1
+    stmt.bindParam(paramIdx, queryVector)
+    inc paramIdx
+    if filters.hasPageNumber:
+      stmt.bindParam(paramIdx, filters.pageNumber)
+      inc paramIdx
+    if filters.sectionSubstring.len > 0:
+      stmt.bindParam(paramIdx, normalizedSection)
+      inc paramIdx
+    stmt.bindParam(paramIdx, topK)
+
+    for row in db.instantRows(stmt):
+      result.add(readSearchResult(row))
+  finally:
+    if not stmt.isNil:
+      stmt.finalize()
+
+proc searchChunks*(db: DbConn; queryVector: seq[float32]; topK: int;
+    filters = SearchFilters()): seq[SearchResult] =
+  if filters.hasFilters:
+    result = db.runFilteredSearch(queryVector, filters, topK)
+  else:
+    result = db.runTopKSearch("vector_quantize_scan", queryVector, topK)

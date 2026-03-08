@@ -1,7 +1,7 @@
 import std/[os, strutils]
 import relay
 import ./chunkvec/[chunk_store, constants, embeddings_client, logging, runtime_config,
-  types]
+  search_input, types]
 
 proc shutdownRelay(client: Relay; shouldAbort: bool) =
   if shouldAbort:
@@ -35,8 +35,8 @@ proc runSearchApp*(): int =
     if not fileExists(cfg.dbPath):
       raise newException(ValueError, "database does not exist: " & cfg.dbPath)
 
-    let queryText = readFile(cfg.inputPath).strip()
-    if queryText.len == 0:
+    let searchInput = parseSearchInput(cfg.inputPath, readFile(cfg.inputPath))
+    if searchInput.queryText.len == 0:
       raise newException(ValueError, "query text must be provided in input file")
 
     client = newRelay(
@@ -44,7 +44,7 @@ proc runSearchApp*(): int =
       defaultTimeoutMs = cfg.networkConfig.totalTimeoutMs
     )
 
-    let queryVector = requestEmbeddingWithRetry(client, cfg, queryText)
+    let queryVector = requestEmbeddingWithRetry(client, cfg, searchInput.queryText)
 
     db = openDatabase(cfg.dbPath)
     dbOpened = true
@@ -52,7 +52,7 @@ proc runSearchApp*(): int =
     db.initSchema()
     db.initializeVectorTable()
 
-    let rows = db.searchChunks(queryVector, cfg.topK)
+    let rows = db.searchChunks(queryVector, cfg.topK, searchInput.filters)
     for i in 0 ..< rows.len:
       renderResult(rows[i], i + 1)
 
