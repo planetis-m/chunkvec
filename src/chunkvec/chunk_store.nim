@@ -125,8 +125,7 @@ proc readSearchResult(row: InstantRow): SearchResult =
     )
   )
 
-proc runTopKSearch(db: DbConn; scanProc: string; queryVector: seq[float32];
-    topK: int): seq[SearchResult] =
+proc runTopKSearch(db: DbConn; queryVector: seq[float32]; topK: int): seq[SearchResult] =
   let query =
     """SELECT
   c.id,
@@ -137,7 +136,7 @@ proc runTopKSearch(db: DbConn; scanProc: string; queryVector: seq[float32];
   c.page_number,
   c.section
 FROM """ & TableName & """ AS c
-JOIN """ & scanProc & """('""" & TableName & """', '""" &
+JOIN vector_quantize_scan('""" & TableName & """', '""" &
     EmbeddingColumn & """', ?, ?) AS v
   ON c.id = v.rowid
 ORDER BY v.distance ASC, c.id ASC;
@@ -158,8 +157,8 @@ ORDER BY v.distance ASC, c.id ASC;
 proc normalizedSectionExpr(column: string): string =
   result = "lower(replace(" & column & ", '_', ''))"
 
-proc runFilteredSearch(db: DbConn; queryVector: seq[float32];
-    filters: SearchFilters; topK: int): seq[SearchResult] =
+proc runFilteredSearch(db: DbConn; queryVector: seq[float32]; filters: SearchFilters;
+    topK: int): seq[SearchResult] =
   var query =
     """SELECT
   c.id,
@@ -175,14 +174,16 @@ JOIN vector_quantize_scan('""" & TableName & """', '""" &
   ON c.id = v.rowid
 """
 
-  var conditions: seq[string]
+  var haveWhereClause = false
   if filters.pageNumber != NoPageFilter:
-    conditions.add("c.page_number = ?")
+    query.add("WHERE c.page_number = ?\n")
+    haveWhereClause = true
   if filters.sectionSubstring.len > 0:
-    conditions.add("instr(" & normalizedSectionExpr("c.section") & ", ?) > 0")
-
-  if conditions.len > 0:
-    query.add("WHERE " & conditions.join(" AND ") & "\n")
+    if haveWhereClause:
+      query.add("AND ")
+    else:
+      query.add("WHERE ")
+    query.add("instr(" & normalizedSectionExpr("c.section") & ", ?) > 0\n")
 
   query.add("ORDER BY v.distance ASC, c.id ASC\n")
   query.add("LIMIT ?;")
@@ -214,4 +215,4 @@ proc searchChunks*(db: DbConn; queryVector: seq[float32]; topK: int;
   if filters.hasFilters:
     result = db.runFilteredSearch(queryVector, filters, topK)
   else:
-    result = db.runTopKSearch("vector_quantize_scan", queryVector, topK)
+    result = db.runTopKSearch(queryVector, topK)
