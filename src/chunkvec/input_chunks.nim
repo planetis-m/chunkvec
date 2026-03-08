@@ -1,5 +1,5 @@
 import std/[parseutils, strutils]
-import ./types
+import ./[marker_parser, types]
 
 const
   MarkerName = "page"
@@ -8,9 +8,6 @@ const
 proc failParse(source: string; ordinal: int; message: string) {.noreturn.} =
   raise newException(ValueError,
     source & ": invalid chunk " & $ordinal & ": " & message)
-
-proc skipMarkerWhitespace(text: string; pos: var int) =
-  pos.inc(skipWhitespace(text, pos))
 
 proc trimChunkBounds(text: string; startPos, endPos: int): Slice[int] =
   var first = startPos
@@ -46,79 +43,39 @@ proc findNextMarkerStart(text: string; startPos: int): int =
       break
     inc pos
 
-proc parseQuotedValue(source: string; ordinal: int; text: string; pos: var int): string =
-  if pos >= text.len or text[pos] != '"':
-    failParse(source, ordinal, "section must use a double-quoted string")
-
-  inc pos
-  let valueStart = pos
-  while pos < text.len and text[pos] != '"':
-    inc pos
-  if pos >= text.len:
-    failParse(source, ordinal, "unterminated quoted string in marker")
-
-  result = text[valueStart ..< pos]
-  inc pos
-
 proc parsePageMarker(source: string; ordinal: int; text: string; startPos: int): tuple[
     metadata: ChunkMetadata, nextPos: int] =
-  var pos = startPos
-  if pos >= text.len or text[pos] != '<':
-    failParse(source, ordinal, "missing <page ...> marker")
-  inc pos
-
-  var markerName = ""
-  let markerLen = parseIdent(text, markerName, pos)
-  if markerLen == 0 or markerName != MarkerName:
-    failParse(source, ordinal, "expected <page ...> marker")
-  pos.inc(markerLen)
-
+  var metadata: ChunkMetadata
+  var nextPos = 0
   var sawPageNumber = false
-  var sawSection = false
 
-  while true:
-    skipMarkerWhitespace(text, pos)
-    if pos >= text.len:
-      failParse(source, ordinal, "unterminated marker")
-    if text[pos] == '>':
-      inc pos
-      break
-
-    var attrName = ""
-    let attrLen = parseIdent(text, attrName, pos)
-    if attrLen == 0:
-      failParse(source, ordinal, "expected attribute name in marker")
-    pos.inc(attrLen)
-
-    skipMarkerWhitespace(text, pos)
-    if pos >= text.len or text[pos] != '=':
-      failParse(source, ordinal, "expected '=' after attribute " & attrName)
-    inc pos
-    skipMarkerWhitespace(text, pos)
-
+  proc parsePageAttr(attrName: string; text: string; pos: var int) =
     case attrName
     of "n":
-      if sawPageNumber:
-        failParse(source, ordinal, "duplicate n attribute")
       var pageNumber = 0
       let parsed = parseInt(text, pageNumber, pos)
       if parsed == 0:
         failParse(source, ordinal, "n must be an integer")
-      result.metadata.pageNumber = pageNumber
+      metadata.pageNumber = pageNumber
       sawPageNumber = true
       pos.inc(parsed)
     of "section":
-      if sawSection:
-        failParse(source, ordinal, "duplicate section attribute")
-      result.metadata.section = parseQuotedValue(source, ordinal, text, pos)
-      sawSection = true
+      try:
+        metadata.section = parseQuotedValue(text, pos)
+      except ValueError:
+        failParse(source, ordinal, "section must use a double-quoted string")
     else:
       failParse(source, ordinal, "unknown attribute " & attrName)
+
+  try:
+    nextPos = parseMarker(text, startPos, MarkerName, parsePageAttr)
+  except ValueError:
+    failParse(source, ordinal, "expected <page ...> marker")
 
   if not sawPageNumber:
     failParse(source, ordinal, "missing required n attribute")
 
-  result.nextPos = pos
+  result = (metadata: metadata, nextPos: nextPos)
 
 proc parseInputChunks*(source, text: string): seq[InputChunk] =
   var pos = skipWhitespace(text)
