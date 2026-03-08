@@ -5,7 +5,6 @@ type
     maxInflight*: int
     totalTimeoutMs*: int
     maxRetries*: int
-    topK*: int
 
   SqliteConfig* = object
     extensionPath*: string
@@ -13,6 +12,7 @@ type
   RuntimeConfig* = object
     inputPath*: string
     dbPath*: string
+    topK*: int
     openaiConfig*: OpenAIConfig
     networkConfig*: NetworkConfig
     sqliteConfig*: SqliteConfig

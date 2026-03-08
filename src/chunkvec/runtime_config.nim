@@ -114,6 +114,7 @@ proc buildRuntimeConfig*(cliArgs: seq[string]): RuntimeConfig =
   result = RuntimeConfig(
     inputPath: parsed.inputPath,
     dbPath: parsed.dbPath,
+    topK: ifPositive(rawConfig.top_k, TopK),
     openaiConfig: OpenAIConfig(
       url: resolvedApiUrl,
       apiKey: resolvedApiKey
@@ -121,8 +122,7 @@ proc buildRuntimeConfig*(cliArgs: seq[string]): RuntimeConfig =
     networkConfig: NetworkConfig(
       maxInflight: ifPositive(rawConfig.max_inflight, MaxInflight),
       totalTimeoutMs: ifPositive(rawConfig.total_timeout_ms, TotalTimeoutMs),
-      maxRetries: ifNonNegative(rawConfig.max_retries, MaxRetries),
-      topK: ifPositive(rawConfig.top_k, TopK)
+      maxRetries: ifNonNegative(rawConfig.max_retries, MaxRetries)
     ),
     sqliteConfig: SqliteConfig(
       extensionPath: extensionPath()

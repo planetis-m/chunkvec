@@ -48,7 +48,7 @@ proc runSearchApp*(): int =
     db.initSchema()
     db.initializeVectorTable()
 
-    let rows = db.searchChunks(queryVector, cfg.networkConfig.topK)
+    let rows = db.searchChunks(queryVector, cfg.topK)
     for i in 0 ..< rows.len:
       renderResult(rows[i], i + 1)
 
