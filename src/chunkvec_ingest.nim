@@ -23,9 +23,6 @@ proc runIngestApp*(): int =
         "missing API key; set DEEPINFRA_API_KEY or api_key in config.json")
     if not fileExists(cfg.inputPath):
       raise newException(ValueError, "input file does not exist: " & cfg.inputPath)
-    if not fileExists(cfg.sqliteConfig.extensionPath):
-      raise newException(ValueError,
-        "sqlite-vector extension does not exist: " & cfg.sqliteConfig.extensionPath)
 
     let chunks = loadInputChunks(cfg.inputPath, BreakMarker)
     if chunks.len == 0:

@@ -61,7 +61,7 @@ proc loadExtension*(db: DbConn; extensionPath: string) =
   if rc != SQLITE_OK:
     var message = "failed to load sqlite extension " & extensionPath
     if not errMsg.isNil:
-      message &= ": " & $errMsg
+      message.add ": " & $errMsg
       sqlite3.free(errMsg)
     raise newException(IOError, message)
 

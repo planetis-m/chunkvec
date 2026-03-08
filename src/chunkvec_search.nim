@@ -32,9 +32,6 @@ proc runSearchApp*(): int =
         "missing API key; set DEEPINFRA_API_KEY or api_key in config.json")
     if not fileExists(cfg.dbPath):
       raise newException(ValueError, "database does not exist: " & cfg.dbPath)
-    if not fileExists(cfg.sqliteConfig.extensionPath):
-      raise newException(ValueError,
-        "sqlite-vector extension does not exist: " & cfg.sqliteConfig.extensionPath)
 
     let queryText = stdin.readAll().strip()
     if queryText.len == 0:
