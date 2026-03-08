@@ -6,7 +6,6 @@ const
   ApiUrl* = "https://api.deepinfra.com/v1/openai/embeddings"
   Model* = "Qwen/Qwen3-Embedding-0.6B"
   EmbeddingDimension* = 1024
-  BreakMarker* = "<bk>"
   MaxInflight* = 32
   TotalTimeoutMs* = 120_000
   MaxRetries* = 5

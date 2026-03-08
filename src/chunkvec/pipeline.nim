@@ -2,7 +2,7 @@ import std/[monotimes, os, random, times]
 import relay
 import openai/[core, embeddings, retry]
 import ./[embeddings_client, request_id_codec, retry_and_errors, retry_queue,
-  chunk_store, constants, types]
+  chunk_store, types]
 
 const
   RetryPollSliceMs = 25
@@ -70,7 +70,8 @@ proc flushOrderedResults(db: DbConn; insertStmt: SqlPrepared; state: var Pipelin
         record.chunk.ordinal,
         record.chunk.text,
         record.embedding,
-        record.chunk.metadataJson
+        record.chunk.metadata.pageNumber,
+        record.chunk.metadata.section
       )
       state.wroteRows = true
 

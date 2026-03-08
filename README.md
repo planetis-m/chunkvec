@@ -12,7 +12,7 @@ and later answers similarity queries locally from that database.
 
 - chunk boundaries stay under your control; `chunkvec` never re-chunks text
 - ingest preserves the original order with explicit `ordinal` values
-- optional per-chunk JSON metadata headers stay attached to rows
+- per-chunk page metadata stays attached to rows
 - search does one remote embedding call, then runs nearest-neighbor lookup
   locally through `sqlite-vector`
 
@@ -22,7 +22,7 @@ and later answers similarity queries locally from that database.
 
 1. `chunkvec_ingest`:
 - reads one input text file
-- splits it on the built-in `<bk>` marker
+- parses required leading `<page ...>` markers
 - sends embedding requests with bounded in-flight work and retries
 - inserts successful chunks into SQLite in original order
 - initializes and quantizes the `sqlite-vector` column
@@ -123,7 +123,6 @@ Built-in defaults:
 
 - endpoint: `https://api.deepinfra.com/v1/openai/embeddings`
 - model: `Qwen/Qwen3-Embedding-0.6B`
-- marker: `<bk>`
 - max inflight: `32`
 - max retries: `5`
 - total timeout: `120000 ms`
@@ -146,46 +145,53 @@ Built-in defaults:
 
 ## Input format
 
-`chunkvec_ingest` splits the input file on the built-in `<bk>` marker.
+`chunkvec_ingest` requires every chunk to start with a `<page ...>` marker.
 
-Plain-text chunks:
+Minimal chunks:
 
 ```text
-First chunk.<bk>
-Second chunk.<bk>
+<page n=1>
+First chunk.
+
+<page n=2>
+Second chunk.
+
+<page n=3>
 Third chunk.
 ```
 
-Optional metadata header per chunk:
+Page plus section metadata:
 
 ```text
-{"page":12,"section":"Backpropagation"}
+<page n=12 section="Backpropagation">
+Gradient descent updates weights using the negative gradient.
 
-Gradient descent updates weights using the negative gradient.<bk>
-{"page":13,"section":"Regularization"}
-
+<page n=13 section="Regularization">
 Dropout disables random activations during training.
 ```
 
 Rules:
 
-- whitespace around each chunk is trimmed
-- empty chunks are dropped
-- if a chunk starts with a valid single-line JSON value followed by a blank
-  line, that JSON is stored as metadata
-- metadata is preserved as raw JSON; no keys are promoted to dedicated fields
+- leading file whitespace before the first marker is ignored
+- every chunk must start with `<page ...>`
+- `n` is required and must be an integer
+- `section` is optional and must be double-quoted when present
+- unknown marker attributes are rejected
+- surrounding whitespace around each chunk body is trimmed
+- empty chunk bodies are rejected
 
 ## Quick start
 
 Prepare an input file:
 
 ```text
-{"page":4,"section":"Embeddings"}
+<page n=4 section="Embeddings">
+Embeddings map text into vectors where similar meanings stay close.
 
-Embeddings map text into vectors where similar meanings stay close.<bk>
-{"page":5,"section":"Vector Search"}
+<page n=5 section="Vector Search">
+Nearest-neighbor search compares a query vector against stored vectors.
 
-Nearest-neighbor search compares a query vector against stored vectors.<bk>
+<page n=6>
 Use cosine distance when direction matters more than magnitude.
 ```
 
@@ -216,10 +222,10 @@ Search:
 Typical output:
 
 ```text
-1. distance=0.123456 source=notes.txt ordinal=1 metadata={"page":4,"section":"Embeddings"}
+1. distance=0.123456 source=notes.txt ordinal=1 page=4 section="Embeddings"
 Embeddings map text into vectors where similar meanings stay close.
 
-2. distance=0.187654 source=notes.txt ordinal=2 metadata={"page":5,"section":"Vector Search"}
+2. distance=0.187654 source=notes.txt ordinal=2 page=5 section="Vector Search"
 Nearest-neighbor search compares a query vector against stored vectors.
 ```
 
@@ -246,6 +252,6 @@ nim test tests/ci.nims
 
 The test suite covers:
 
-- chunk splitting and metadata parsing
+- page-marker parsing
 - request-id packing
 - SQLite plus `sqlite-vector` integration

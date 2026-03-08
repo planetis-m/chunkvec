@@ -65,7 +65,8 @@ proc initSchema*(db: DbConn) =
   ordinal INTEGER NOT NULL,
   text TEXT NOT NULL,
   """ & EmbeddingColumn & """ BLOB NOT NULL,
-  metadata_json TEXT,
+  page_number INTEGER NOT NULL,
+  section TEXT NOT NULL,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );"""
   ))
@@ -97,8 +98,9 @@ proc prepareInsertStatement*(db: DbConn): SqlPrepared =
   ordinal,
   text,
   """ & EmbeddingColumn & """,
-  metadata_json
-) VALUES (?, ?, ?, ?, ?);
+  page_number,
+  section
+) VALUES (?, ?, ?, ?, ?, ?);
 """
   )
 
@@ -119,7 +121,8 @@ proc runSearch(db: DbConn; scanProc: string; queryVector: seq[float32];
   c.source,
   c.ordinal,
   c.text,
-  c.metadata_json
+  c.page_number,
+  c.section
 FROM """ & TableName & """ AS c
 JOIN """ & scanProc & """('""" & TableName & """', '""" &
     EmbeddingColumn & """', ?, ?) AS v
@@ -140,7 +143,10 @@ ORDER BY v.distance ASC, c.id ASC;
         source: row.textColumn(2),
         ordinal: sqlite3.column_int(row, 3).int,
         text: row.textColumn(4),
-        metadataJson: row.textColumn(5)
+        metadata: ChunkMetadata(
+          pageNumber: sqlite3.column_int(row, 5).int,
+          section: row.textColumn(6)
+        )
       )
 
       result.add(resultRow)

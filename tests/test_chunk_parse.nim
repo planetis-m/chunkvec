@@ -1,31 +1,45 @@
 import ../src/chunkvec/[input_chunks, types]
 
-proc testJsonHeaderChunk() =
-  let chunk = parseChunkBody("slides.md", 1,
-    "{" & '"' & "page" & '"' & ":12," & '"' & "section" & '"' & ":" &
-    '"' & "Intro" & '"' & "}\n\nHello\nworld")
-  doAssert chunk.source == "slides.md"
-  doAssert chunk.ordinal == 1
-  doAssert chunk.metadataJson == "{\"page\":12,\"section\":\"Intro\"}"
-  doAssert chunk.text == "Hello\nworld"
+proc testPageMarkerChunk() =
+  let chunks = parseInputChunks("slides.md",
+    """<page n=12 section="Intro">
+Hello
+world""")
+  doAssert chunks.len == 1
+  doAssert chunks[0].source == "slides.md"
+  doAssert chunks[0].ordinal == 1
+  doAssert chunks[0].metadata == ChunkMetadata(pageNumber: 12, section: "Intro")
+  doAssert chunks[0].text == "Hello\nworld"
 
-proc testArrayHeaderChunk() =
-  let chunk = parseChunkBody("slides.md", 2, "[1,2,3]\n\nHello")
-  doAssert chunk.metadataJson == "[1,2,3]"
-  doAssert chunk.text == "Hello"
+proc testMultipleChunks() =
+  let chunks = parseInputChunks("slides.md",
+    """<page section="Intro" n=12>
+Hello
 
-proc testPlainTextChunk() =
-  let chunk = parseChunkBody("notes.txt", 3, "just text")
-  doAssert chunk.metadataJson.len == 0
-  doAssert chunk.text == "just text"
+<page n=13>
+World""")
+  doAssert chunks.len == 2
+  doAssert chunks[0].metadata == ChunkMetadata(pageNumber: 12, section: "Intro")
+  doAssert chunks[0].text == "Hello"
+  doAssert chunks[1].metadata == ChunkMetadata(pageNumber: 13, section: "")
+  doAssert chunks[1].text == "World"
 
-proc testOpaqueHeaderChunk() =
-  let chunk = parseChunkBody("notes.txt", 4, "{oops}\n\nhello")
-  doAssert chunk.metadataJson == "{oops}"
-  doAssert chunk.text == "hello"
+proc testRejectUnknownAttribute() =
+  doAssertRaises(ValueError):
+    discard parseInputChunks("slides.md", """<page n=12 title="Intro">
+Hello""")
+
+proc testRejectMissingMarker() =
+  doAssertRaises(ValueError):
+    discard parseInputChunks("notes.txt", "just text")
+
+proc testRejectEmptyChunkBody() =
+  doAssertRaises(ValueError):
+    discard parseInputChunks("slides.md", "<page n=1>\n\n")
 
 when isMainModule:
-  testJsonHeaderChunk()
-  testArrayHeaderChunk()
-  testPlainTextChunk()
-  testOpaqueHeaderChunk()
+  testPageMarkerChunk()
+  testMultipleChunks()
+  testRejectUnknownAttribute()
+  testRejectMissingMarker()
+  testRejectEmptyChunkBody()

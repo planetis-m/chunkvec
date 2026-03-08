@@ -1,6 +1,10 @@
 import openai/core
 
 type
+  ChunkMetadata* = object
+    pageNumber*: int
+    section*: string
+
   NetworkConfig* = object
     maxInflight*: int
     totalTimeoutMs*: int
@@ -21,7 +25,7 @@ type
     source*: string
     ordinal*: int
     text*: string
-    metadataJson*: string
+    metadata*: ChunkMetadata
 
   ChunkRecord* = object
     chunk*: InputChunk
@@ -54,4 +58,4 @@ type
     source*: string
     ordinal*: int
     text*: string
-    metadataJson*: string
+    metadata*: ChunkMetadata

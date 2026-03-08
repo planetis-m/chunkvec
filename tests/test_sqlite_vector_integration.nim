@@ -32,7 +32,8 @@ proc testSqliteVectorRoundTrip() =
     1,
     "alpha",
     unitVector(0),
-    "{\"page\":7,\"section\":\"Intro\"}"
+    7,
+    "Intro"
   )
   db.exec(
     stmt,
@@ -40,6 +41,7 @@ proc testSqliteVectorRoundTrip() =
     2,
     "beta",
     unitVector(1),
+    8,
     ""
   )
   db.commitTransaction()
@@ -48,7 +50,7 @@ proc testSqliteVectorRoundTrip() =
   let rows = db.searchChunks(unitVector(0), 1)
   doAssert rows.len == 1
   doAssert rows[0].text == "alpha"
-  doAssert rows[0].metadataJson == "{\"page\":7,\"section\":\"Intro\"}"
+  doAssert rows[0].metadata == ChunkMetadata(pageNumber: 7, section: "Intro")
 
 when isMainModule:
   testSqliteVectorRoundTrip()
