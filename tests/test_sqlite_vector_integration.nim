@@ -62,7 +62,7 @@ proc testSqliteVectorRoundTrip() =
   doAssert rows[0].metadata == ChunkMetadata(pageNumber: 7, section: "Intro_Basics")
 
   let pageRows = db.searchChunks(unitVector(0), 3,
-    SearchFilters(hasPageNumber: true, pageNumber: 7))
+    SearchFilters(pageNumber: 7))
   doAssert pageRows.len == 2
   doAssert pageRows[0].metadata.pageNumber == 7
   doAssert pageRows[1].metadata.pageNumber == 7
@@ -74,7 +74,6 @@ proc testSqliteVectorRoundTrip() =
 
   let combinedRows = db.searchChunks(unitVector(0), 3,
     SearchFilters(
-      hasPageNumber: true,
       pageNumber: 7,
       sectionSubstring: "deep intro"
     ))

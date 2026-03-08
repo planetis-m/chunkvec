@@ -1,13 +1,15 @@
 import openai/core
 
+const
+  NoPageFilter* = -1
+
 type
   ChunkMetadata* = object
     pageNumber*: int
     section*: string
 
   SearchFilters* = object
-    hasPageNumber*: bool
-    pageNumber*: int
+    pageNumber*: int = NoPageFilter
     sectionSubstring*: string
 
   SearchInput* = object
@@ -69,5 +71,8 @@ type
     text*: string
     metadata*: ChunkMetadata
 
+proc initSearchFilters*(): SearchFilters {.inline.} =
+  result = SearchFilters(pageNumber: NoPageFilter, sectionSubstring: "")
+
 proc hasFilters*(filters: SearchFilters): bool {.inline.} =
-  result = filters.hasPageNumber or filters.sectionSubstring.len > 0
+  result = filters.pageNumber != NoPageFilter or filters.sectionSubstring.len > 0

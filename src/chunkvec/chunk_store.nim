@@ -176,7 +176,7 @@ JOIN vector_quantize_scan('""" & TableName & """', '""" &
 """
 
   var conditions: seq[string]
-  if filters.hasPageNumber:
+  if filters.pageNumber != NoPageFilter:
     conditions.add("c.page_number = ?")
   if filters.sectionSubstring.len > 0:
     conditions.add("instr(" & normalizedSectionExpr("c.section") & ", ?) > 0")
@@ -195,7 +195,7 @@ JOIN vector_quantize_scan('""" & TableName & """', '""" &
     var paramIdx = 1
     stmt.bindParam(paramIdx, queryVector)
     inc paramIdx
-    if filters.hasPageNumber:
+    if filters.pageNumber != NoPageFilter:
       stmt.bindParam(paramIdx, filters.pageNumber)
       inc paramIdx
     if filters.sectionSubstring.len > 0:
@@ -210,7 +210,7 @@ JOIN vector_quantize_scan('""" & TableName & """', '""" &
       stmt.finalize()
 
 proc searchChunks*(db: DbConn; queryVector: seq[float32]; topK: int;
-    filters = SearchFilters()): seq[SearchResult] =
+    filters = initSearchFilters()): seq[SearchResult] =
   if filters.hasFilters:
     result = db.runFilteredSearch(queryVector, filters, topK)
   else:
