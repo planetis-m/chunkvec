@@ -3,6 +3,10 @@ import std/[strutils, parseutils]
 type
   MarkerAttrParser* = proc(attrName: string; text: string; pos: var int)
 
+proc failParse*(source, subject, message: string) {.noreturn.} =
+  raise newException(ValueError,
+    source & ": invalid " & subject & ": " & message)
+
 proc skipMarkerWhitespace*(text: string; pos: var int) =
   pos.inc(skipWhitespace(text, pos))
 

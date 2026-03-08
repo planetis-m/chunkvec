@@ -1,5 +1,5 @@
 import std/[parseutils, strutils]
-import ./[marker_parser, parse_errors, types]
+import ./[marker_parser, types]
 
 const
   SearchMarkerName = "search"
