@@ -29,9 +29,6 @@ type
     source*: string
     ordinal*: int
     text*: string
-    hasPage*: bool
-    page*: int
-    section*: string
     metadataJson*: string
 
   ChunkRecord* = object
@@ -64,6 +61,4 @@ type
     source*: string
     ordinal*: int
     text*: string
-    hasPage*: bool
-    page*: int
-    section*: string
+    metadataJson*: string

@@ -26,38 +26,29 @@ proc testSqliteVectorRoundTrip() =
   defer: stmt.finalize()
 
   db.beginTransaction()
-  db.insertChunk(stmt, ChunkRecord(
-    chunk: InputChunk(
-      source: "notes.txt",
-      ordinal: 1,
-      text: "alpha",
-      hasPage: true,
-      page: 7,
-      section: "Intro",
-      metadataJson: "{\"page\":7,\"section\":\"Intro\"}"
-    ),
-    embedding: unitVector(0)
-  ))
-  db.insertChunk(stmt, ChunkRecord(
-    chunk: InputChunk(
-      source: "notes.txt",
-      ordinal: 2,
-      text: "beta",
-      hasPage: false,
-      page: 0,
-      section: "",
-      metadataJson: ""
-    ),
-    embedding: unitVector(1)
-  ))
+  db.exec(
+    stmt,
+    "notes.txt",
+    1,
+    "alpha",
+    packFloat32Blob(unitVector(0)),
+    "{\"page\":7,\"section\":\"Intro\"}"
+  )
+  db.exec(
+    stmt,
+    "notes.txt",
+    2,
+    "beta",
+    packFloat32Blob(unitVector(1)),
+    ""
+  )
   db.commitTransaction()
   db.rebuildQuantization()
 
   let rows = db.searchChunks(unitVector(0), 1)
   doAssert rows.len == 1
   doAssert rows[0].text == "alpha"
-  doAssert rows[0].hasPage
-  doAssert rows[0].page == 7
+  doAssert rows[0].metadataJson == "{\"page\":7,\"section\":\"Intro\"}"
 
 when isMainModule:
   testSqliteVectorRoundTrip()

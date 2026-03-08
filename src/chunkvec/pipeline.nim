@@ -63,7 +63,15 @@ proc flushOrderedResults(db: DbConn; insertStmt: SqlPrepared; state: var Pipelin
     if state.staged[state.nextFinalizeSeqId].status != ChunkOk:
       state.allSucceeded = false
     else:
-      db.insertChunk(insertStmt, state.records[state.nextFinalizeSeqId])
+      let record = state.records[state.nextFinalizeSeqId]
+      db.exec(
+        insertStmt,
+        record.chunk.source,
+        record.chunk.ordinal,
+        record.chunk.text,
+        packFloat32Blob(record.embedding),
+        record.chunk.metadataJson
+      )
       state.wroteRows = true
 
     state.staged[state.nextFinalizeSeqId] = default(ChunkResult)

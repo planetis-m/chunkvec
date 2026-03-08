@@ -1,4 +1,3 @@
-import std/strutils
 import ../src/chunkvec/[input_chunks, types]
 
 proc testJsonHeaderChunk() =
@@ -7,19 +6,26 @@ proc testJsonHeaderChunk() =
     '"' & "Intro" & '"' & "}\n\nHello\nworld")
   doAssert chunk.source == "slides.md"
   doAssert chunk.ordinal == 1
-  doAssert chunk.hasPage
-  doAssert chunk.page == 12
-  doAssert chunk.section == "Intro"
-  doAssert chunk.metadataJson.contains("\"page\":12")
+  doAssert chunk.metadataJson == "{\"page\":12,\"section\":\"Intro\"}"
   doAssert chunk.text == "Hello\nworld"
 
+proc testArrayHeaderChunk() =
+  let chunk = parseChunkBody("slides.md", 2, "[1,2,3]\n\nHello")
+  doAssert chunk.metadataJson == "[1,2,3]"
+  doAssert chunk.text == "Hello"
+
 proc testPlainTextChunk() =
-  let chunk = parseChunkBody("notes.txt", 2, "just text")
-  doAssert not chunk.hasPage
-  doAssert chunk.section.len == 0
+  let chunk = parseChunkBody("notes.txt", 3, "just text")
   doAssert chunk.metadataJson.len == 0
   doAssert chunk.text == "just text"
 
+proc testInvalidHeaderFallsBackToPlainText() =
+  let chunk = parseChunkBody("notes.txt", 4, "{oops}\n\nhello")
+  doAssert chunk.metadataJson.len == 0
+  doAssert chunk.text == "{oops}\n\nhello"
+
 when isMainModule:
   testJsonHeaderChunk()
+  testArrayHeaderChunk()
   testPlainTextChunk()
+  testInvalidHeaderFallsBackToPlainText()

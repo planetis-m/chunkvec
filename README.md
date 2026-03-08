@@ -12,7 +12,7 @@ and later answers similarity queries locally from that database.
 
 - chunk boundaries stay under your control; `chunkvec` never re-chunks text
 - ingest preserves the original order with explicit `ordinal` values
-- optional per-chunk metadata headers (`page`, `section`) stay attached to rows
+- optional per-chunk JSON metadata headers stay attached to rows
 - search does one remote embedding call, then runs nearest-neighbor lookup
   locally through `sqlite-vector`
 
@@ -171,9 +171,9 @@ Rules:
 
 - whitespace around each chunk is trimmed
 - empty chunks are dropped
-- if a chunk starts with a JSON object followed by a blank line, that object is
-  stored as metadata
-- today the parsed metadata fields are `page` and `section`
+- if a chunk starts with a valid single-line JSON value followed by a blank
+  line, that JSON is stored as metadata
+- metadata is preserved as raw JSON; no keys are promoted to dedicated fields
 
 ## Quick start
 
@@ -216,10 +216,10 @@ printf '%s\n' 'How do embeddings help search?' | ./chunkvec_search notes.sqlite
 Typical output:
 
 ```text
-1. distance=0.123456 source=notes.txt ordinal=1 page=4 section=Embeddings
+1. distance=0.123456 source=notes.txt ordinal=1 metadata={"page":4,"section":"Embeddings"}
 Embeddings map text into vectors where similar meanings stay close.
 
-2. distance=0.187654 source=notes.txt ordinal=2 page=5 section=Vector Search
+2. distance=0.187654 source=notes.txt ordinal=2 metadata={"page":5,"section":"Vector Search"}
 Nearest-neighbor search compares a query vector against stored vectors.
 ```
 

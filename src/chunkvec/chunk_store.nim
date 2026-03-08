@@ -4,7 +4,7 @@ import ./[constants, types]
 
 export db_sqlite
 
-proc packFloat32Blob(values: openArray[float32]): seq[byte] =
+proc packFloat32Blob*(values: openArray[float32]): seq[byte] =
   result = newSeq[byte](values.len * sizeof(float32))
   if result.len > 0:
     copyMem(addr result[0], addr values[0], result.len)
@@ -47,12 +47,6 @@ proc textColumn(row: InstantRow; index: int32): string =
 proc isNil(stmt: SqlPrepared): bool {.inline.} =
   result = sqlite3.PStmt(stmt).isNil
 
-proc resetStatement(db: DbConn; stmt: SqlPrepared; action: string) =
-  if sqlite3.reset(sqlite3.PStmt(stmt)) != SQLITE_OK:
-    raise db.sqliteError(action)
-  if sqlite3.clear_bindings(sqlite3.PStmt(stmt)) != SQLITE_OK:
-    raise db.sqliteError(action)
-
 proc openDatabase*(path: string): DbConn =
   result = db_sqlite.open(path, "", "", "")
 
@@ -81,8 +75,6 @@ proc initSchema*(db: DbConn) =
   ordinal INTEGER NOT NULL,
   text TEXT NOT NULL,
   """ & EmbeddingColumn & """ BLOB NOT NULL,
-  page INTEGER,
-  section TEXT,
   metadata_json TEXT,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );"""
@@ -115,38 +107,10 @@ proc prepareInsertStatement*(db: DbConn): SqlPrepared =
   ordinal,
   text,
   """ & EmbeddingColumn & """,
-  page,
-  section,
   metadata_json
-) VALUES (?, ?, ?, vector_as_f32(?), ?, ?, ?);
+) VALUES (?, ?, ?, vector_as_f32(?), ?);
 """
   )
-
-proc insertChunk*(db: DbConn; stmt: SqlPrepared; record: ChunkRecord) =
-  db.resetStatement(stmt, "failed to reset insert statement")
-
-  stmt.bindParam(1, record.chunk.source)
-  stmt.bindParam(2, record.chunk.ordinal)
-  stmt.bindParam(3, record.chunk.text)
-  stmt.bindParam(4, packFloat32Blob(record.embedding))
-
-  if record.chunk.hasPage:
-    stmt.bindParam(5, record.chunk.page)
-  else:
-    stmt.bindNull(5)
-
-  if record.chunk.section.len > 0:
-    stmt.bindParam(6, record.chunk.section)
-  else:
-    stmt.bindNull(6)
-
-  if record.chunk.metadataJson.len > 0:
-    stmt.bindParam(7, record.chunk.metadataJson)
-  else:
-    stmt.bindNull(7)
-
-  if not db.tryExec(stmt):
-    raise db.sqliteError("failed to insert chunk row")
 
 proc rebuildQuantization*(db: DbConn) =
   let options = "qtype=" & QuantizationType
@@ -165,8 +129,7 @@ proc runSearch(db: DbConn; scanProc: string; queryVector: openArray[float32];
   c.source,
   c.ordinal,
   c.text,
-  c.page,
-  c.section
+  c.metadata_json
 FROM """ & TableName & """ AS c
 JOIN """ & scanProc & """('""" & TableName & """', '""" &
     EmbeddingColumn & """', ?, ?) AS v
@@ -187,17 +150,8 @@ ORDER BY v.distance ASC, c.id ASC;
         source: row.textColumn(2),
         ordinal: sqlite3.column_int(row, 3).int,
         text: row.textColumn(4),
-        hasPage: false,
-        page: 0,
-        section: ""
+        metadataJson: row.textColumn(5)
       )
-
-      if sqlite3.column_type(row, 5) != SQLITE_NULL:
-        resultRow.hasPage = true
-        resultRow.page = sqlite3.column_int(row, 5).int
-
-      if sqlite3.column_type(row, 6) != SQLITE_NULL:
-        resultRow.section = row.textColumn(6)
 
       result.add(resultRow)
   finally:

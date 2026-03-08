@@ -12,10 +12,8 @@ proc shutdownRelay(client: Relay; shouldAbort: bool) =
 proc renderResult(row: SearchResult; rank: int) =
   var header = $rank & ". distance=" & formatFloat(row.distance, ffDecimal, 6) &
     " source=" & row.source & " ordinal=" & $row.ordinal
-  if row.hasPage:
-    header &= " page=" & $row.page
-  if row.section.len > 0:
-    header &= " section=" & row.section
+  if row.metadataJson.len > 0:
+    header &= " metadata=" & row.metadataJson
 
   stdout.writeLine(header)
   stdout.writeLine(row.text)

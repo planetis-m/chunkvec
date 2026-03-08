@@ -7,9 +7,6 @@ proc parseChunkBody*(source: string; ordinal: int; body: string): InputChunk =
     source: source,
     ordinal: ordinal,
     text: body.strip(),
-    hasPage: false,
-    page: 0,
-    section: "",
     metadataJson: ""
   )
 
@@ -19,13 +16,11 @@ proc parseChunkBody*(source: string; ordinal: int; body: string): InputChunk =
     return
 
   let headerText = lines[0].strip()
-  if headerText.len == 0 or headerText[0] != '{':
+  if headerText.len == 0:
     return
 
   try:
-    let node = parseJson(headerText)
-    if node.kind != JObject:
-      return
+    discard parseJson(headerText)
 
     var textLines: seq[string]
     for i in 2 ..< lines.len:
@@ -37,12 +32,6 @@ proc parseChunkBody*(source: string; ordinal: int; body: string): InputChunk =
 
     result.text = parsedText
     result.metadataJson = headerText
-
-    if node.hasKey("page") and node["page"].kind == JInt:
-      result.hasPage = true
-      result.page = node["page"].getInt()
-    if node.hasKey("section") and node["section"].kind == JString:
-      result.section = node["section"].getStr()
   except CatchableError:
     discard
 
