@@ -24,7 +24,7 @@ type
 
   SearchCliConfig* = object
     dbPath*: string
-    queryText*: string
+    queryPath*: string
     runtime*: RuntimeConfig
 
   InputChunk* = object

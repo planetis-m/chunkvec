@@ -40,13 +40,17 @@ proc runSearchApp*(): int =
     if cfg.openaiConfig.apiKey.len == 0:
       raise newException(ValueError,
         "missing API key; set DEEPINFRA_API_KEY or api_key in config.json")
-    if cli.queryText.len == 0:
-      raise newException(ValueError, "query text was empty")
     if not fileExists(cli.dbPath):
       raise newException(ValueError, "database does not exist: " & cli.dbPath)
+    if not fileExists(cli.queryPath):
+      raise newException(ValueError, "query file does not exist: " & cli.queryPath)
     if not fileExists(cfg.sqliteConfig.extensionPath):
       raise newException(ValueError,
         "sqlite-vector extension does not exist: " & cfg.sqliteConfig.extensionPath)
+
+    let queryText = readFile(cli.queryPath).strip()
+    if queryText.len == 0:
+      raise newException(ValueError, "query file did not contain any text")
 
     client = newRelay(
       maxInFlight = 1,
@@ -55,7 +59,7 @@ proc runSearchApp*(): int =
 
     let item = client.makeRequest(embeddingRequest(
       cfg.openaiConfig,
-      buildEmbeddingParams(cfg, cli.queryText),
+      buildEmbeddingParams(cfg, queryText),
       requestId = 1,
       timeoutMs = cfg.networkConfig.totalTimeoutMs
     ))

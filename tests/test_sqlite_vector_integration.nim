@@ -4,7 +4,7 @@ import ../src/chunkvec/[chunk_store, sqlite_vector_paths, types]
 proc testSqliteVectorRoundTrip() =
   let repoRoot = getCurrentDir()
   let dbPath = repoRoot / "test_files" / "vector_test.sqlite"
-  let extensionPath = repoRoot / defaultSqliteVectorExtensionRelativePath()
+  let extensionPath = repoRoot / sqliteVectorExtensionFilename()
   if fileExists(dbPath):
     removeFile(dbPath)
 

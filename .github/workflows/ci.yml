@@ -36,16 +36,14 @@ jobs:
 
       - name: Download SQLite Vector
         run: |
-          mkdir -p third_party/sqlite
           curl -fL \
             "https://github.com/sqliteai/sqlite-vector/releases/download/${{ env.SQLITE_VECTOR_VERSION }}/vector-linux-x86_64-${{ env.SQLITE_VECTOR_VERSION }}.tar.gz" \
             -o vector-linux-x86_64.tar.gz
-          tar -xf vector-linux-x86_64.tar.gz -C third_party/sqlite
-          candidate="$(find third_party/sqlite -type f -name 'vector.so' | head -n 1)"
+          mkdir -p sqlite-vector-download
+          tar -xf vector-linux-x86_64.tar.gz -C sqlite-vector-download
+          candidate="$(find sqlite-vector-download -type f -name 'vector.so' | head -n 1)"
           test -n "$candidate"
-          if [ "$candidate" != "third_party/sqlite/vector.so" ]; then
-            mv "$candidate" third_party/sqlite/vector.so
-          fi
+          cp "$candidate" vector.so
 
       - name: Build apps
         run: |
@@ -78,16 +76,14 @@ jobs:
 
       - name: Download SQLite Vector
         run: |
-          mkdir -p third_party/sqlite
           curl -fL \
             "https://github.com/sqliteai/sqlite-vector/releases/download/${{ env.SQLITE_VECTOR_VERSION }}/vector-macos-${{ env.SQLITE_VECTOR_VERSION }}.tar.gz" \
             -o vector-macos.tar.gz
-          tar -xf vector-macos.tar.gz -C third_party/sqlite
-          candidate="$(find third_party/sqlite -type f -name 'vector.dylib' | head -n 1)"
+          mkdir -p sqlite-vector-download
+          tar -xf vector-macos.tar.gz -C sqlite-vector-download
+          candidate="$(find sqlite-vector-download -type f -name 'vector.dylib' | head -n 1)"
           test -n "$candidate"
-          if [ "$candidate" != "third_party/sqlite/vector.dylib" ]; then
-            mv "$candidate" third_party/sqlite/vector.dylib
-          fi
+          cp "$candidate" vector.dylib
 
       - name: Build apps
         run: |
@@ -126,20 +122,16 @@ jobs:
       - name: Download SQLite Vector
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path third_party/sqlite | Out-Null
           curl.exe -fL `
             "https://github.com/sqliteai/sqlite-vector/releases/download/${{ env.SQLITE_VECTOR_VERSION }}/vector-windows-x86_64-${{ env.SQLITE_VECTOR_VERSION }}.zip" `
             -o vector-windows-x86_64.zip
-          Expand-Archive -Path vector-windows-x86_64.zip -DestinationPath third_party/sqlite -Force
-          $candidate = Get-ChildItem -Path third_party/sqlite -Recurse -Filter vector.dll |
+          Expand-Archive -Path vector-windows-x86_64.zip -DestinationPath sqlite-vector-download -Force
+          $candidate = Get-ChildItem -Path sqlite-vector-download -Recurse -Filter vector.dll |
             Select-Object -First 1
           if ($null -eq $candidate) {
             throw "vector.dll not found in archive"
           }
-          $expected = Join-Path $pwd "third_party/sqlite/vector.dll"
-          if ($candidate.FullName -ne $expected) {
-            Move-Item $candidate.FullName $expected -Force
-          }
+          Copy-Item $candidate.FullName (Join-Path $pwd "vector.dll") -Force
 
       - name: Build apps
         shell: pwsh

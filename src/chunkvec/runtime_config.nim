@@ -1,4 +1,5 @@
-import std/[envvars, files, os, parseopt, paths, strutils]
+import std/[envvars, files, parseopt, paths]
+from std/os import getAppDir
 import jsonx
 import openai/core
 import ./[constants, logging, types]
@@ -11,17 +12,15 @@ type
     api_key: string
     api_url: string
     model: string
-    break_marker: string
     max_inflight: int
     max_retries: int
     total_timeout_ms: int
-    vector_extension_path: string
     top_k: int
 
 const
   IngestHelpText = """
 Usage:
-  chunkvec_ingest INPUT.txt| - DB.sqlite
+  chunkvec_ingest INPUT.txt DB.sqlite
 
 Options:
   --help, -h       Show this help and exit.
@@ -29,7 +28,7 @@ Options:
 
   SearchHelpText = """
 Usage:
-  chunkvec_search DB.sqlite QUERY|-
+  chunkvec_search DB.sqlite QUERY.txt
 
 Options:
   --help, -h       Show this help and exit.
@@ -43,23 +42,11 @@ proc defaultJsonRuntimeConfig(): JsonRuntimeConfig =
     api_key: "",
     api_url: ApiUrl,
     model: Model,
-    break_marker: BreakMarker,
     max_inflight: MaxInflight,
     max_retries: MaxRetries,
     total_timeout_ms: TotalTimeoutMs,
-    vector_extension_path: defaultSqliteVectorExtensionRelativePath(),
     top_k: TopK
   )
-
-proc resolveAppBaseDir(): string =
-  let appDir = os.getAppDir()
-  let repoConfigPath = appDir.parentDir / DefaultConfigPath
-  if fileExists(appDir / DefaultConfigPath):
-    result = appDir
-  elif fileExists(repoConfigPath):
-    result = appDir.parentDir
-  else:
-    result = appDir
 
 proc loadOptionalJsonRuntimeConfig(path: Path): JsonRuntimeConfig =
   result = defaultJsonRuntimeConfig()
@@ -80,17 +67,6 @@ proc resolveApiKey(configApiKey: string): string =
   else:
     result = configApiKey
 
-proc resolveExtensionPath(baseDir, rawPath: string): string =
-  let resolvedPath =
-    if rawPath.len == 0:
-      baseDir / defaultSqliteVectorExtensionRelativePath()
-    elif rawPath.isAbsolute:
-      rawPath
-    else:
-      baseDir / rawPath
-
-  result = normalizeSqliteVectorExtensionPath(resolvedPath)
-
 template ifNonEmpty(value, fallback: untyped): untyped =
   if value.len > 0: value
   else: fallback
@@ -104,15 +80,13 @@ template ifNonNegative(value, fallback: untyped): untyped =
   else: fallback
 
 proc buildRuntimeConfig(): RuntimeConfig =
-  let baseDir = resolveAppBaseDir()
-  let configPath = Path(baseDir) / Path(DefaultConfigPath)
+  let configPath = Path(getAppDir()) / Path(DefaultConfigPath)
   let rawConfig = loadOptionalJsonRuntimeConfig(configPath)
   let resolvedApiKey = resolveApiKey(rawConfig.api_key)
   let resolvedApiUrl = ifNonEmpty(rawConfig.api_url, ApiUrl)
-  let resolvedExtensionPath = resolveExtensionPath(baseDir, rawConfig.vector_extension_path)
 
   result = RuntimeConfig(
-    breakMarker: ifNonEmpty(rawConfig.break_marker, BreakMarker),
+    breakMarker: BreakMarker,
     openaiConfig: OpenAIConfig(
       url: resolvedApiUrl,
       apiKey: resolvedApiKey
@@ -125,7 +99,7 @@ proc buildRuntimeConfig(): RuntimeConfig =
       topK: ifPositive(rawConfig.top_k, TopK)
     ),
     sqliteConfig: SqliteConfig(
-      extensionPath: resolvedExtensionPath
+      extensionPath: appLocalSqliteVectorExtensionPath()
     )
   )
 
@@ -157,7 +131,7 @@ proc parseIngestCliArgs(cliArgs: seq[string]): tuple[inputPath, dbPath: string] 
 
   result = (inputPath: positional[0], dbPath: positional[1])
 
-proc parseSearchCliArgs(cliArgs: seq[string]): tuple[dbPath, queryText: string] =
+proc parseSearchCliArgs(cliArgs: seq[string]): tuple[dbPath, queryPath: string] =
   var parser = initOptParser(cliArgs)
   var positional: seq[string]
 
@@ -180,9 +154,11 @@ proc parseSearchCliArgs(cliArgs: seq[string]): tuple[dbPath, queryText: string] 
 
   if positional.len < 2:
     cliError("missing required DB and QUERY arguments", SearchHelpText)
+  if positional.len > 2:
+    cliError("too many positional arguments", SearchHelpText)
 
   result.dbPath = positional[0]
-  result.queryText = positional[1 .. ^1].join(" ")
+  result.queryPath = positional[1]
 
 proc buildIngestRuntimeConfig*(cliArgs: seq[string]): IngestCliConfig =
   let parsed = parseIngestCliArgs(cliArgs)
@@ -194,14 +170,9 @@ proc buildIngestRuntimeConfig*(cliArgs: seq[string]): IngestCliConfig =
 
 proc buildSearchRuntimeConfig*(cliArgs: seq[string]): SearchCliConfig =
   let parsed = parseSearchCliArgs(cliArgs)
-  let queryText =
-    if parsed.queryText == "-":
-      stdin.readAll().strip()
-    else:
-      parsed.queryText.strip()
 
   result = SearchCliConfig(
     dbPath: parsed.dbPath,
-    queryText: queryText,
+    queryPath: parsed.queryPath,
     runtime: buildRuntimeConfig()
   )

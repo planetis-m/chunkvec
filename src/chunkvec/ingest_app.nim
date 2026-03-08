@@ -22,7 +22,7 @@ proc runIngestApp*(): int =
     if cfg.openaiConfig.apiKey.len == 0:
       raise newException(ValueError,
         "missing API key; set DEEPINFRA_API_KEY or api_key in config.json")
-    if cli.inputPath != "-" and not fileExists(cli.inputPath):
+    if not fileExists(cli.inputPath):
       raise newException(ValueError, "input file does not exist: " & cli.inputPath)
     if not fileExists(cfg.sqliteConfig.extensionPath):
       raise newException(ValueError,

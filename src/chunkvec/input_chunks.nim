@@ -52,12 +52,9 @@ proc parseInputChunks*(source, text, marker: string): seq[InputChunk] =
     result.add(parseChunkBody(source, i + 1, pieces[i]))
 
 proc readInputText*(path: string): tuple[source, text: string] =
-  if path == "-":
-    result = (source: "stdin", text: stdin.readAll())
-  else:
-    if not fileExists(path):
-      raise newException(ValueError, "input file does not exist: " & path)
-    result = (source: path, text: readFile(path))
+  if not fileExists(path):
+    raise newException(ValueError, "input file does not exist: " & path)
+  result = (source: path, text: readFile(path))
 
 proc loadInputChunks*(path, marker: string): seq[InputChunk] =
   let loaded = readInputText(path)

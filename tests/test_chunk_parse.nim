@@ -14,7 +14,7 @@ proc testJsonHeaderChunk() =
   doAssert chunk.text == "Hello\nworld"
 
 proc testPlainTextChunk() =
-  let chunk = parseChunkBody("stdin", 2, "just text")
+  let chunk = parseChunkBody("notes.txt", 2, "just text")
   doAssert not chunk.hasPage
   doAssert chunk.section.len == 0
   doAssert chunk.metadataJson.len == 0
