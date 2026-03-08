@@ -62,6 +62,7 @@ jobs:
           cp chunkvec_ingest dist/
           cp chunkvec_search dist/
           cp config.json dist/
+          cp LICENSE.md dist/
           cp README.md dist/
           cp vector.so dist/
           tar -czf chunkvec-linux-x86_64.tar.gz -C dist .
@@ -117,6 +118,7 @@ jobs:
           cp chunkvec_ingest dist/
           cp chunkvec_search dist/
           cp config.json dist/
+          cp LICENSE.md dist/
           cp README.md dist/
           cp vector.dylib dist/
           tar -czf chunkvec-macos-arm64.tar.gz -C dist .
@@ -186,6 +188,7 @@ jobs:
           Copy-Item chunkvec_ingest.exe dist\
           Copy-Item chunkvec_search.exe dist\
           Copy-Item config.json dist\
+          Copy-Item LICENSE.md dist\
           Copy-Item README.md dist\
           Copy-Item vector.dll dist\
           Copy-Item "$env:VCPKG_ROOT\\bin\\*.dll" dist\ -ErrorAction Stop
@@ -232,7 +235,7 @@ jobs:
           - Windows x86_64: chunkvec-windows-x86_64.zip
 
           Each archive includes the chunkvec_ingest and chunkvec_search executables,
-          config.json, README.md, and the sqlite-vector runtime library beside the apps.
+          config.json, LICENSE.md, README.md, and the sqlite-vector runtime library beside the apps.
           The Windows archive also includes the required runtime DLLs from vcpkg.
           EOF
 
