@@ -1,4 +1,4 @@
-version       = "0.1.0"
+version       = "0.1.1"
 author        = "planetis"
 description   = "Store and search embeddings for pre-chunked text with SQLite vector search"
 license       = "AGPL-3.0"
