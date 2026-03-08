@@ -1,13 +1,13 @@
 import std/[strformat, strutils]
 import db_connector/[db_sqlite, sqlite3]
-import ./[constants, logging, types]
+import ./[constants, types]
 
 export db_sqlite
 
 proc packFloat32Blob(values: openArray[float32]): seq[byte] =
   result = newSeq[byte](values.len * sizeof(float32))
   if result.len > 0:
-    copyMem(addr result[0], unsafeAddr values[0], result.len)
+    copyMem(addr result[0], addr values[0], result.len)
 
 when defined(windows):
   when defined(nimOldDlls):
@@ -285,13 +285,4 @@ ORDER BY v.distance ASC, c.id ASC;
 
 proc searchChunks*(db: DbConn; queryVector: openArray[float32];
     topK: int): seq[SearchResult] =
-  try:
-    result = db.runSearch("vector_quantize_scan", queryVector, topK)
-  except CatchableError:
-    let message = getCurrentExceptionMsg()
-    if message.toLowerAscii().contains("vector_quantize") or
-        message.toLowerAscii().contains("quantization"):
-      logWarn("quantized search unavailable; falling back to full scan")
-      result = db.runSearch("vector_full_scan", queryVector, topK)
-    else:
-      raise
+  result = db.runSearch("vector_quantize_scan", queryVector, topK)
