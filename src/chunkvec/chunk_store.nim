@@ -1,4 +1,4 @@
-import std/[strformat, strutils]
+import std/strutils
 import db_connector/[db_sqlite, sqlite3]
 import ./[constants, types]
 
@@ -74,21 +74,23 @@ proc loadExtension*(db: DbConn; extensionPath: string) =
   db.checkSqliteRc(sqlite3EnableLoadExtension(db, 0), "failed to disable sqlite extension loading")
 
 proc initSchema*(db: DbConn) =
-  db.exec(sql(&"""
-CREATE TABLE IF NOT EXISTS {TableName} (
+  db.exec(sql(
+    """CREATE TABLE IF NOT EXISTS """ & TableName & """ (
   id INTEGER PRIMARY KEY,
   source TEXT NOT NULL,
   ordinal INTEGER NOT NULL,
   text TEXT NOT NULL,
-  {EmbeddingColumn} BLOB NOT NULL,
+  """ & EmbeddingColumn & """ BLOB NOT NULL,
   page INTEGER,
   section TEXT,
   metadata_json TEXT,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-);"""))
-  db.exec(sql(&"""
-CREATE INDEX IF NOT EXISTS idx_chunks_source_ordinal
-  ON {TableName}(source, ordinal);"""))
+);"""
+  ))
+  db.exec(sql(
+    """CREATE INDEX IF NOT EXISTS idx_chunks_source_ordinal
+  ON """ & TableName & """(source, ordinal);"""
+  ))
 
 proc beginTransaction*(db: DbConn) =
   db.exec(sql"BEGIN IMMEDIATE TRANSACTION;")
@@ -100,21 +102,25 @@ proc rollbackTransaction*(db: DbConn) =
   db.exec(sql"ROLLBACK;")
 
 proc initializeVectorTable*(db: DbConn) =
-  let options = &"type={VectorType},dimension={EmbeddingDimension},distance={DistanceMetric}"
+  let options =
+    "type=" & VectorType &
+    ",dimension=" & $EmbeddingDimension &
+    ",distance=" & DistanceMetric
   discard db.getValue(sql"SELECT vector_init(?, ?, ?);", TableName, EmbeddingColumn, options)
 
 proc prepareInsertStatement*(db: DbConn): SqlPrepared =
-  result = db.prepare(&"""
-INSERT INTO {TableName}(
+  result = db.prepare(
+    """INSERT INTO """ & TableName & """(
   source,
   ordinal,
   text,
-  {EmbeddingColumn},
+  """ & EmbeddingColumn & """,
   page,
   section,
   metadata_json
 ) VALUES (?, ?, ?, vector_as_f32(?), ?, ?, ?);
-""")
+"""
+  )
 
 proc insertChunk*(db: DbConn; stmt: SqlPrepared; record: ChunkRecord) =
   db.resetStatement(stmt, "failed to reset insert statement")
@@ -148,12 +154,12 @@ proc rebuildQuantization*(db: DbConn) =
   discard db.getValue(sql"SELECT vector_quantize_preload(?, ?);", TableName, EmbeddingColumn)
 
 proc rowCount*(db: DbConn): int =
-  result = parseInt(db.getValue(sql(&"SELECT COUNT(*) FROM {TableName};")))
+  result = parseInt(db.getValue(sql("SELECT COUNT(*) FROM " & TableName & ";")))
 
 proc runSearch(db: DbConn; scanProc: string; queryVector: openArray[float32];
     topK: int): seq[SearchResult] =
-  let query = &"""
-SELECT
+  let query =
+    """SELECT
   c.id,
   v.distance,
   c.source,
@@ -161,8 +167,9 @@ SELECT
   c.text,
   c.page,
   c.section
-FROM {TableName} AS c
-JOIN {scanProc}('{TableName}', '{EmbeddingColumn}', ?, ?) AS v
+FROM """ & TableName & """ AS c
+JOIN """ & scanProc & """('""" & TableName & """', '""" &
+    EmbeddingColumn & """', ?, ?) AS v
   ON c.id = v.rowid
 ORDER BY v.distance ASC, c.id ASC;
 """
