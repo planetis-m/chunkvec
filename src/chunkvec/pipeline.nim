@@ -143,11 +143,20 @@ proc processEmbeddingSuccess(chunks: seq[InputChunk]; seqId, attempt: int; body:
       message = "embeddings response had no vectors"
     )
   else:
-    state.records[seqId] = ChunkRecord(
-      chunk: chunks[seqId],
-      embedding: embedding(parsed)
-    )
-    state.staged[seqId] = okChunkResult(attempt)
+    let embeddingLen = embedding(parsed).len
+    if embeddingLen != EmbeddingDimension:
+      state.staged[seqId] = errorChunkResult(
+        attempts = attempt,
+        kind = PayloadError,
+        message = "embedding dimension mismatch: expected " & $EmbeddingDimension &
+          ", got " & $embeddingLen
+      )
+    else:
+      state.records[seqId] = ChunkRecord(
+        chunk: chunks[seqId],
+        embedding: move embedding(parsed)
+      )
+      state.staged[seqId] = okChunkResult(attempt)
 
 proc processResult(cfg: RuntimeConfig; chunks: seq[InputChunk]; item: RequestResult;
     maxAttempts: int; retryPolicy: RetryPolicy; state: var PipelineState) =

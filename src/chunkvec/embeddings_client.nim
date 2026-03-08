@@ -36,4 +36,9 @@ proc requestEmbeddingWithRetry*(client: Relay; cfg: RuntimeConfig;
       var parsed: EmbeddingCreateResult
       if not embeddingParse(item.response.body, parsed):
         raise newException(ValueError, "failed to parse embeddings response")
-      return embedding(parsed)
+      let embeddingLen = embedding(parsed).len
+      if embeddingLen != EmbeddingDimension:
+        raise newException(ValueError, "embedding dimension mismatch: expected " & $EmbeddingDimension &
+          ", got " & $embeddingLen)
+      result = move embedding(parsed)
+      break
