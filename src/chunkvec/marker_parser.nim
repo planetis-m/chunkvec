@@ -1,8 +1,5 @@
 import std/[strutils, parseutils]
 
-type
-  MarkerAttrParser* = proc(attrName: string; text: string; pos: var int)
-
 proc failParse*(message: string) {.noreturn.} =
   raise newException(ValueError, message)
 
@@ -25,42 +22,49 @@ proc parseQuotedValue*(text: string; value: var string; start: int): int =
   inc pos
   result = pos - start
 
-proc parseMarker*(text: string; startPos: int; markerName: string;
-    parseAttr: MarkerAttrParser): int =
-  var pos = startPos
-  if pos >= text.len or text[pos] != '<':
-    return 0
-  inc pos
-
-  var parsedName = ""
-  let markerLen = parseIdent(text, parsedName, pos)
-  if markerLen == 0 or parsedName != markerName:
-    return 0
-  pos.inc(markerLen)
-
-  while true:
-    skipMarkerWhitespace(text, pos)
-    if pos >= text.len:
-      return 0
-    if text[pos] == '>':
+template parseMarker*(text: string; startPos: int; markerName: string;
+    parseAttr: untyped): int =
+  block:
+    var pos {.inject.} = startPos
+    if pos >= text.len or text[pos] != '<':
+      0
+    else:
       inc pos
-      break
 
-    var attrName = ""
-    let attrLen = parseIdent(text, attrName, pos)
-    if attrLen == 0:
-      return 0
-    pos.inc(attrLen)
+      var parsedName = ""
+      let markerLen = parseIdent(text, parsedName, pos)
+      if markerLen == 0 or parsedName != markerName:
+        0
+      else:
+        pos.inc(markerLen)
 
-    skipMarkerWhitespace(text, pos)
-    if pos >= text.len or text[pos] != '=':
-      return 0
-    inc pos
-    skipMarkerWhitespace(text, pos)
+        var parsedOk = true
+        while parsedOk:
+          skipMarkerWhitespace(text, pos)
+          if pos >= text.len:
+            parsedOk = false
+          elif text[pos] == '>':
+            inc pos
+            break
+          else:
+            var attrName {.inject.} = ""
+            let attrLen = parseIdent(text, attrName, pos)
+            if attrLen == 0:
+              parsedOk = false
+            else:
+              pos.inc(attrLen)
+              skipMarkerWhitespace(text, pos)
+              if pos >= text.len or text[pos] != '=':
+                parsedOk = false
+              else:
+                inc pos
+                skipMarkerWhitespace(text, pos)
+                parseAttr
 
-    parseAttr(attrName, text, pos)
-
-  result = pos - startPos
+        if parsedOk:
+          pos - startPos
+        else:
+          0
 
 proc markerAtLineStart*(text: string; pos: int; prefix: string): bool =
   if pos < 0 or pos + prefix.len > text.len:

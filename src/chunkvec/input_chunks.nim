@@ -18,20 +18,16 @@ proc trimChunkBounds(text: string; startPos, endPos: int): Slice[int] =
 
 proc parseChunkMarker(text: string; metadata: var ChunkMetadata; startPos: int): int =
   var docId = ""
-  var haveDocId = false
-  var kind = ChunkKind.none
-  var haveKind = false
-  var position = 0
-  var havePosition = false
+  var kind = none
+  var position = NoPositionFilter
   var label = ""
 
-  proc parseChunkAttr(attrName: string; text: string; pos: var int) =
+  let parsedLen = parseMarker(text, startPos, ChunkMarkerName):
     case attrName
     of "doc":
       let parsed = parseQuotedValue(text, docId, pos)
       if parsed == 0:
         failParse("doc must use a double-quoted string")
-      haveDocId = true
       pos.inc(parsed)
     of "kind":
       var kindName = ""
@@ -39,13 +35,11 @@ proc parseChunkMarker(text: string; metadata: var ChunkMetadata; startPos: int):
       kind = parseChunkKind(kindName)
       if parsed == 0 or kind == ChunkKind.none:
         failParse("kind must be one of source, derived, assessment")
-      haveKind = true
       pos.inc(parsed)
     of "position":
       let parsed = parseInt(text, position, pos)
       if parsed == 0:
         failParse("position must be an integer")
-      havePosition = true
       pos.inc(parsed)
     of "label":
       let parsed = parseQuotedValue(text, label, pos)
@@ -54,17 +48,13 @@ proc parseChunkMarker(text: string; metadata: var ChunkMetadata; startPos: int):
       pos.inc(parsed)
     else:
       failParse("unknown attribute " & attrName)
-
-  let parsedLen = parseMarker(text, startPos, ChunkMarkerName, parseChunkAttr)
   if parsedLen == 0:
     return 0
-  if not haveDocId:
-    failParse("missing required doc attribute")
   if docId.len == 0:
-    failParse("doc must not be empty")
-  if not haveKind:
+    failParse("missing required doc attribute")
+  if kind == none:
     failParse("missing required kind attribute")
-  if not havePosition:
+  if position == NoPositionFilter:
     failParse("missing required position attribute")
 
   metadata = ChunkMetadata(

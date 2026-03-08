@@ -6,11 +6,11 @@ const
 
 proc parseSearchMarker(text: string; filters: var SearchFilters; startPos: int): int =
   var docId = ""
-  var kind = ChunkKind.none
+  var kind = none
   var position = NoPositionFilter
   var label = ""
 
-  proc parseSearchAttr(attrName: string; text: string; pos: var int) =
+  let parsedLen = parseMarker(text, startPos, SearchMarkerName):
     case attrName
     of "doc":
       let parsed = parseQuotedValue(text, docId, pos)
@@ -21,7 +21,7 @@ proc parseSearchMarker(text: string; filters: var SearchFilters; startPos: int):
       var kindName = ""
       let parsed = parseIdent(text, kindName, pos)
       kind = parseChunkKind(kindName)
-      if parsed == 0 or kind == ChunkKind.none:
+      if parsed == 0 or kind == none:
         failParse("kind must be one of source, derived, assessment")
       pos.inc(parsed)
     of "position":
@@ -36,8 +36,6 @@ proc parseSearchMarker(text: string; filters: var SearchFilters; startPos: int):
       pos.inc(parsed)
     else:
       failParse("unknown attribute " & attrName)
-
-  let parsedLen = parseMarker(text, startPos, SearchMarkerName, parseSearchAttr)
   if parsedLen == 0:
     return 0
 
