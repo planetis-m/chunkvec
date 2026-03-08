@@ -27,9 +27,6 @@ proc sqlite3LoadExtension(db: DbConn; file: cstring; procName: cstring;
     errMsg: ptr cstring): int32 {.
     cdecl, dynlib: SqliteDynlib, importc: "sqlite3_load_extension".}
 
-proc raiseIoError(action: string): ref IOError {.noinline.} =
-  result = newException(IOError, action & ": " & getCurrentExceptionMsg())
-
 proc sqliteError(db: DbConn; action: string): ref IOError {.noinline.} =
   let message =
     if db.isNil:
@@ -57,10 +54,7 @@ proc resetStatement(db: DbConn; stmt: SqlPrepared; action: string) =
     raise db.sqliteError(action)
 
 proc openDatabase*(path: string): DbConn =
-  try:
-    result = db_sqlite.open(path, "", "", "")
-  except CatchableError:
-    raise raiseIoError("failed to open sqlite database at " & path)
+  result = db_sqlite.open(path, "", "", "")
 
 proc loadExtension*(db: DbConn; extensionPath: string) =
   db.checkSqliteRc(
@@ -83,8 +77,7 @@ proc loadExtension*(db: DbConn; extensionPath: string) =
   )
 
 proc initSchema*(db: DbConn) =
-  try:
-    db.exec(sql(fmt"""
+  db.exec(sql(fmt"""
 CREATE TABLE IF NOT EXISTS {TableName} (
   id INTEGER PRIMARY KEY,
   source TEXT NOT NULL,
@@ -96,59 +89,52 @@ CREATE TABLE IF NOT EXISTS {TableName} (
   metadata_json TEXT,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );"""))
-    db.exec(sql(fmt"""
+  db.exec(sql(fmt"""
 CREATE INDEX IF NOT EXISTS idx_chunks_source_ordinal
   ON {TableName}(source, ordinal);"""))
-    db.exec(sql(fmt"""
+  db.exec(sql(fmt"""
 CREATE TABLE IF NOT EXISTS {MetaTableName} (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL
 );"""))
-  except CatchableError:
-    raise raiseIoError("failed to initialize sqlite schema")
 
 proc beginTransaction*(db: DbConn) =
-  try:
-    db.exec(sql"BEGIN IMMEDIATE TRANSACTION;")
-  except CatchableError:
-    raise raiseIoError("failed to begin transaction")
+  db.exec(sql"BEGIN IMMEDIATE TRANSACTION;")
 
 proc commitTransaction*(db: DbConn) =
-  try:
-    db.exec(sql"COMMIT;")
-  except CatchableError:
-    raise raiseIoError("failed to commit transaction")
+  db.exec(sql"COMMIT;")
 
 proc rollbackTransaction*(db: DbConn) =
-  try:
-    db.exec(sql"ROLLBACK;")
-  except CatchableError:
-    raise raiseIoError("failed to roll back transaction")
+  db.exec(sql"ROLLBACK;")
+
+proc invalidMetadataValue(key: string; value: string) {.noinline, noreturn.} =
+  raise newException(IOError,
+    "invalid sqlite metadata value for " & key & ": " & value)
 
 proc readMetadata*(db: DbConn): DbMetadata =
-  try:
-    for row in db.fastRows(sql(fmt"SELECT key, value FROM {MetaTableName};")):
-      let key = row[0]
-      let value = row[1]
-      case key
-      of "model":
-        result.model = value
-      of "dimension":
+  for row in db.fastRows(sql(fmt"SELECT key, value FROM {MetaTableName};")):
+    let key = row[0]
+    let value = row[1]
+    case key
+    of "model":
+      result.model = value
+    of "dimension":
+      try:
         result.dimension = parseInt(value)
-      of "distance":
-        result.distance = value
-      of "qtype":
-        result.qtype = value
-      else:
-        discard
+      except ValueError:
+        invalidMetadataValue(key, value)
+    of "distance":
+      result.distance = value
+    of "qtype":
+      result.qtype = value
+    else:
+      discard
 
-    result.initialized =
-      result.model.len > 0 and
-      result.dimension > 0 and
-      result.distance.len > 0 and
-      result.qtype.len > 0
-  except CatchableError:
-    raise raiseIoError("failed to read sqlite metadata")
+  result.initialized =
+    result.model.len > 0 and
+    result.dimension > 0 and
+    result.distance.len > 0 and
+    result.qtype.len > 0
 
 proc writeMetadata*(db: DbConn; meta: DbMetadata) =
   var stmt: SqlPrepared
@@ -164,8 +150,6 @@ proc writeMetadata*(db: DbConn; meta: DbMetadata) =
       ("qtype", meta.qtype)
     ]:
       db.exec(stmt, pair[0], pair[1])
-  except CatchableError:
-    raise raiseIoError("failed to write sqlite metadata")
   finally:
     if not stmt.isNil:
       stmt.finalize()
@@ -175,12 +159,9 @@ proc initializeVectorTable*(db: DbConn; meta: DbMetadata) =
     return
 
   let options = fmt"type=FLOAT32,dimension={meta.dimension},distance={meta.distance}"
-  try:
-    discard db.getValue(
-      sql(fmt"SELECT vector_init('{TableName}', '{EmbeddingColumn}', '{options}');")
-    )
-  except CatchableError:
-    raise raiseIoError("failed to execute vector_init")
+  discard db.getValue(
+    sql(fmt"SELECT vector_init('{TableName}', '{EmbeddingColumn}', '{options}');")
+  )
 
 proc configuredMetadata*(model: string; dimension: int): DbMetadata =
   DbMetadata(
@@ -203,8 +184,7 @@ proc ensureMetadataCompatible*(meta: DbMetadata; model: string; dimension: int) 
       ", got " & $dimension)
 
 proc prepareInsertStatement*(db: DbConn): SqlPrepared =
-  try:
-    result = db.prepare(fmt"""
+  result = db.prepare(fmt"""
 INSERT INTO {TableName}(
   source,
   ordinal,
@@ -215,61 +195,46 @@ INSERT INTO {TableName}(
   metadata_json
 ) VALUES (?, ?, ?, vector_as_f32(?), ?, ?, ?);
 """)
-  except CatchableError:
-    raise raiseIoError("failed to prepare chunk insert")
 
 proc insertChunk*(db: DbConn; stmt: SqlPrepared; record: ChunkRecord) =
   db.resetStatement(stmt, "failed to reset insert statement")
 
-  try:
-    stmt.bindParam(1, record.chunk.source)
-    stmt.bindParam(2, record.chunk.ordinal)
-    stmt.bindParam(3, record.chunk.text)
-    stmt.bindParam(4, packFloat32Blob(record.embedding))
+  stmt.bindParam(1, record.chunk.source)
+  stmt.bindParam(2, record.chunk.ordinal)
+  stmt.bindParam(3, record.chunk.text)
+  stmt.bindParam(4, packFloat32Blob(record.embedding))
 
-    if record.chunk.hasPage:
-      stmt.bindParam(5, record.chunk.page)
-    else:
-      stmt.bindNull(5)
+  if record.chunk.hasPage:
+    stmt.bindParam(5, record.chunk.page)
+  else:
+    stmt.bindNull(5)
 
-    if record.chunk.section.len > 0:
-      stmt.bindParam(6, record.chunk.section)
-    else:
-      stmt.bindNull(6)
+  if record.chunk.section.len > 0:
+    stmt.bindParam(6, record.chunk.section)
+  else:
+    stmt.bindNull(6)
 
-    if record.chunk.metadataJson.len > 0:
-      stmt.bindParam(7, record.chunk.metadataJson)
-    else:
-      stmt.bindNull(7)
+  if record.chunk.metadataJson.len > 0:
+    stmt.bindParam(7, record.chunk.metadataJson)
+  else:
+    stmt.bindNull(7)
 
-    if sqlite3.step(sqlite3.PStmt(stmt)) != SQLITE_DONE:
-      raise db.sqliteError("failed to insert chunk row")
-  except CatchableError:
-    raise raiseIoError("failed to insert chunk row")
+  if sqlite3.step(sqlite3.PStmt(stmt)) != SQLITE_DONE:
+    raise db.sqliteError("failed to insert chunk row")
 
 proc rebuildQuantization*(db: DbConn; meta: DbMetadata) =
   if not meta.initialized:
     return
 
-  try:
-    discard db.getValue(
-      sql(fmt"SELECT vector_quantize('{TableName}', '{EmbeddingColumn}', 'qtype={meta.qtype}');")
-    )
-  except CatchableError:
-    raise raiseIoError("failed to execute vector_quantize")
-
-  try:
-    discard db.getValue(
-      sql(fmt"SELECT vector_quantize_preload('{TableName}', '{EmbeddingColumn}');")
-    )
-  except CatchableError:
-    raise raiseIoError("failed to execute vector_quantize_preload")
+  discard db.getValue(
+    sql(fmt"SELECT vector_quantize('{TableName}', '{EmbeddingColumn}', 'qtype={meta.qtype}');")
+  )
+  discard db.getValue(
+    sql(fmt"SELECT vector_quantize_preload('{TableName}', '{EmbeddingColumn}');")
+  )
 
 proc rowCount*(db: DbConn): int =
-  try:
-    result = parseInt(db.getValue(sql(fmt"SELECT COUNT(*) FROM {TableName};")))
-  except CatchableError:
-    raise raiseIoError("failed to count chunk rows")
+  result = parseInt(db.getValue(sql(fmt"SELECT COUNT(*) FROM {TableName};")))
 
 proc runSearch(db: DbConn; scanProc: string; queryVector: openArray[float32];
     topK: int): seq[SearchResult] =
@@ -314,8 +279,6 @@ ORDER BY v.distance ASC, c.id ASC;
         resultRow.section = row.textColumn(6)
 
       result.add(resultRow)
-  except CatchableError:
-    raise raiseIoError("failed to execute vector search")
   finally:
     if not stmt.isNil:
       stmt.finalize()
