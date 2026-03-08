@@ -10,7 +10,7 @@ proc parseSearchMarker(text: string; filters: var SearchFilters; startPos: int):
   var position = NoPositionFilter
   var label = ""
 
-  let parsedLen = parseMarker(text, startPos, SearchMarkerName):
+  let parsedLen = parseMarker(SearchMarkerName, pos, attrName):
     case attrName
     of "doc":
       let parsed = parseQuotedValue(text, docId, pos)

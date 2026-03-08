@@ -22,7 +22,7 @@ proc parseChunkMarker(text: string; metadata: var ChunkMetadata; startPos: int):
   var position = NoPositionFilter
   var label = ""
 
-  let parsedLen = parseMarker(text, startPos, ChunkMarkerName):
+  let parsedLen = parseMarker(ChunkMarkerName, pos, attrName):
     case attrName
     of "doc":
       let parsed = parseQuotedValue(text, docId, pos)

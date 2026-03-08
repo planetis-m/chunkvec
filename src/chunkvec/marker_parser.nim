@@ -13,58 +13,56 @@ proc parseQuotedValue*(text: string; value: var string; start: int): int =
 
   inc pos
   let valueStart = pos
-  while pos < text.len and text[pos] != '"':
-    inc pos
-  if pos >= text.len:
+  let valueLen = skipUntil(text, '"', pos)
+  if pos + valueLen >= text.len:
     return 0
 
-  value = text[valueStart ..< pos]
+  value = text.substr(valueStart, valueStart + valueLen - 1)
+  pos.inc(valueLen)
   inc pos
   result = pos - start
 
-template parseMarker*(text: string; startPos: int; markerName: string;
-    parseAttr: untyped): int =
-  block:
-    var pos {.inject.} = startPos
-    if pos >= text.len or text[pos] != '<':
+template parseMarker*(markerName: string; posName, attrName, parseAttr: untyped): int =
+  var posName = startPos
+  if posName >= text.len or text[posName] != '<':
+    0
+  else:
+    inc posName
+
+    var parsedName = ""
+    let markerLen = parseIdent(text, parsedName, posName)
+    if markerLen == 0 or parsedName != markerName:
       0
     else:
-      inc pos
+      posName.inc(markerLen)
 
-      var parsedName = ""
-      let markerLen = parseIdent(text, parsedName, pos)
-      if markerLen == 0 or parsedName != markerName:
-        0
-      else:
-        pos.inc(markerLen)
-
-        var parsedOk = true
-        while parsedOk:
-          skipMarkerWhitespace(text, pos)
-          if pos >= text.len:
+      var parsedOk = true
+      while parsedOk:
+        skipMarkerWhitespace(text, posName)
+        if posName >= text.len:
+          parsedOk = false
+        elif text[posName] == '>':
+          inc posName
+          break
+        else:
+          var attrName = ""
+          let attrLen = parseIdent(text, attrName, posName)
+          if attrLen == 0:
             parsedOk = false
-          elif text[pos] == '>':
-            inc pos
-            break
           else:
-            var attrName {.inject.} = ""
-            let attrLen = parseIdent(text, attrName, pos)
-            if attrLen == 0:
+            posName.inc(attrLen)
+            skipMarkerWhitespace(text, posName)
+            if posName >= text.len or text[posName] != '=':
               parsedOk = false
             else:
-              pos.inc(attrLen)
-              skipMarkerWhitespace(text, pos)
-              if pos >= text.len or text[pos] != '=':
-                parsedOk = false
-              else:
-                inc pos
-                skipMarkerWhitespace(text, pos)
-                parseAttr
+              inc posName
+              skipMarkerWhitespace(text, posName)
+              parseAttr
 
-        if parsedOk:
-          pos - startPos
-        else:
-          0
+      if parsedOk:
+        posName - startPos
+      else:
+        0
 
 proc markerAtLineStart*(text: string; pos: int; prefix: string): bool =
   if pos < 0 or pos + prefix.len > text.len:
