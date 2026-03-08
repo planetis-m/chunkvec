@@ -17,7 +17,7 @@ proc runIngestApp*(): int =
   var transactionOpen = false
 
   try:
-    let cfg = buildIngestRuntimeConfig(commandLineParams())
+    let cfg = buildRuntimeConfig(commandLineParams())
     if cfg.openaiConfig.apiKey.len == 0:
       raise newException(ValueError,
         "missing API key; set DEEPINFRA_API_KEY or api_key in config.json")

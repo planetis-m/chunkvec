@@ -8,6 +8,10 @@ import ./sqlite_vector_paths
 {.define: jsonxLenient.}
 
 type
+  CliArgs = object
+    inputPath: string
+    dbPath: string
+
   JsonRuntimeConfig = object
     api_key: string
     api_url: string
@@ -16,25 +20,17 @@ type
     total_timeout_ms: int
     top_k: int
 
-const
-  IngestHelpText = """
+const HelpText = """
 Usage:
   chunkvec_ingest INPUT.txt DB.sqlite
+  chunkvec_search QUERY.txt DB.sqlite
 
 Options:
   --help, -h       Show this help and exit.
 """
 
-  SearchHelpText = """
-Usage:
-  chunkvec_search DB.sqlite < QUERY.txt
-
-Options:
-  --help, -h       Show this help and exit.
-"""
-
-proc cliError(message, helpText: string) =
-  quit(message & "\n\n" & helpText, ExitFatalRuntime)
+proc cliError(message: string) =
+  quit(message & "\n\n" & HelpText, ExitFatalRuntime)
 
 proc defaultJsonRuntimeConfig(): JsonRuntimeConfig =
   JsonRuntimeConfig(
@@ -77,15 +73,47 @@ template ifNonNegative(value, fallback: untyped): untyped =
   if value >= 0: value
   else: fallback
 
-proc buildRuntimeConfig(inputPath, dbPath: string): RuntimeConfig =
+proc parseCliArgs(cliArgs: seq[string]): CliArgs =
+  result = CliArgs(inputPath: "", dbPath: "")
+  var parser = initOptParser(cliArgs)
+
+  for kind, key, val in parser.getopt():
+    case kind
+    of cmdArgument:
+      if result.inputPath.len == 0:
+        result.inputPath = parser.key
+      elif result.dbPath.len == 0:
+        result.dbPath = parser.key
+      else:
+        cliError("too many positional arguments")
+    of cmdLongOption:
+      if key == "help":
+        quit(HelpText, ExitAllOk)
+      else:
+        cliError("unknown option: --" & key)
+    of cmdShortOption:
+      if key == "h":
+        quit(HelpText, ExitAllOk)
+      else:
+        cliError("unknown option: -" & key)
+    of cmdEnd:
+      discard
+
+  if result.inputPath.len == 0:
+    cliError("missing required INPUT.txt argument")
+  if result.dbPath.len == 0:
+    cliError("missing required DB.sqlite argument")
+
+proc buildRuntimeConfig*(cliArgs: seq[string]): RuntimeConfig =
+  let parsed = parseCliArgs(cliArgs)
   let configPath = Path(getAppDir()) / Path(DefaultConfigPath)
   let rawConfig = loadOptionalJsonRuntimeConfig(configPath)
   let resolvedApiKey = resolveApiKey(rawConfig.api_key)
   let resolvedApiUrl = ifNonEmpty(rawConfig.api_url, ApiUrl)
 
   result = RuntimeConfig(
-    inputPath: inputPath,
-    dbPath: dbPath,
+    inputPath: parsed.inputPath,
+    dbPath: parsed.dbPath,
     openaiConfig: OpenAIConfig(
       url: resolvedApiUrl,
       apiKey: resolvedApiKey
@@ -100,69 +128,3 @@ proc buildRuntimeConfig(inputPath, dbPath: string): RuntimeConfig =
       extensionPath: extensionPath()
     )
   )
-
-proc parseIngestCliArgs(cliArgs: seq[string]): tuple[inputPath, dbPath: string] =
-  result = (inputPath: "", dbPath: "")
-  var parser = initOptParser(cliArgs)
-
-  for kind, key, val in parser.getopt():
-    case kind
-    of cmdArgument:
-      if result.inputPath.len == 0:
-        result.inputPath = parser.key
-      elif result.dbPath.len == 0:
-        result.dbPath = parser.key
-      else:
-        cliError("too many positional arguments", IngestHelpText)
-    of cmdLongOption:
-      if key == "help":
-        quit(IngestHelpText, ExitAllOk)
-      else:
-        cliError("unknown option: --" & key, IngestHelpText)
-    of cmdShortOption:
-      if key == "h":
-        quit(IngestHelpText, ExitAllOk)
-      else:
-        cliError("unknown option: -" & key, IngestHelpText)
-    of cmdEnd:
-      discard
-
-  if result.inputPath.len == 0:
-    cliError("missing required INPUT.txt argument", IngestHelpText)
-  if result.dbPath.len == 0:
-    cliError("missing required DB.sqlite argument", IngestHelpText)
-
-proc parseSearchCliArgs(cliArgs: seq[string]): string =
-  result = ""
-  var parser = initOptParser(cliArgs)
-
-  for kind, key, val in parser.getopt():
-    case kind
-    of cmdArgument:
-      if result.len == 0:
-        result = parser.key
-      else:
-        cliError("too many positional arguments", SearchHelpText)
-    of cmdLongOption:
-      if key == "help":
-        quit(SearchHelpText, ExitAllOk)
-      else:
-        cliError("unknown option: --" & key, SearchHelpText)
-    of cmdShortOption:
-      if key == "h":
-        quit(SearchHelpText, ExitAllOk)
-      else:
-        cliError("unknown option: -" & key, SearchHelpText)
-    of cmdEnd:
-      discard
-
-  if result.len == 0:
-    cliError("missing required DB.sqlite argument", SearchHelpText)
-
-proc buildIngestRuntimeConfig*(cliArgs: seq[string]): RuntimeConfig =
-  let parsed = parseIngestCliArgs(cliArgs)
-  result = buildRuntimeConfig(parsed.inputPath, parsed.dbPath)
-
-proc buildSearchRuntimeConfig*(cliArgs: seq[string]): RuntimeConfig =
-  let parsed = parseSearchCliArgs(cliArgs)
-  result = buildRuntimeConfig("", parsed)
