@@ -1,6 +1,5 @@
 import std/[os, strutils, syncio]
 import relay
-import openai/[core, embeddings]
 import ./[chunk_store, constants, embeddings_client, logging, runtime_config, types]
 
 proc shutdownRelay(client: Relay; shouldAbort: bool) =
@@ -46,30 +45,7 @@ proc runSearchApp*(): int =
       defaultTimeoutMs = cfg.networkConfig.totalTimeoutMs
     )
 
-    let item = client.makeRequest(embeddingRequest(
-      cfg.openaiConfig,
-      buildEmbeddingParams(cfg, queryText),
-      requestId = 1,
-      timeoutMs = cfg.networkConfig.totalTimeoutMs
-    ))
-
-    if item.error.kind != teNone:
-      raise newException(IOError, item.error.message)
-    if not isHttpSuccess(item.response.code):
-      raise newException(IOError, "embedding request failed with http " &
-        $item.response.code)
-
-    var parsed: EmbeddingCreateResult
-    if not embeddingParse(item.response.body, parsed):
-      raise newException(ValueError, "failed to parse embeddings response")
-    if embeddings(parsed) == 0 or embedding(parsed).len == 0:
-      raise newException(ValueError, "embeddings response had no vectors")
-
-    let queryVector = embedding(parsed)
-    if queryVector.len != EmbeddingDimension:
-      raise newException(ValueError,
-        "embedding dimension mismatch: expected " & $EmbeddingDimension &
-        ", got " & $queryVector.len)
+    let queryVector = requestEmbeddingWithRetry(client, cfg, queryText)
 
     db = openDatabase(cli.dbPath)
     dbOpened = true
