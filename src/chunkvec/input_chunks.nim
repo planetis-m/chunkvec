@@ -1,4 +1,4 @@
-import std/[json, os, strutils]
+import std/strutils
 import ./[chunk_split, types]
 
 proc parseChunkBody*(source: string; ordinal: int; body: string): InputChunk =
@@ -19,32 +19,21 @@ proc parseChunkBody*(source: string; ordinal: int; body: string): InputChunk =
   if headerText.len == 0:
     return
 
-  try:
-    discard parseJson(headerText)
+  var textLines: seq[string]
+  for i in 2 ..< lines.len:
+    textLines.add(lines[i])
 
-    var textLines: seq[string]
-    for i in 2 ..< lines.len:
-      textLines.add(lines[i])
+  let parsedText = textLines.join("\n").strip()
+  if parsedText.len == 0:
+    return
 
-    let parsedText = textLines.join("\n").strip()
-    if parsedText.len == 0:
-      return
-
-    result.text = parsedText
-    result.metadataJson = headerText
-  except CatchableError:
-    discard
+  result.text = parsedText
+  result.metadataJson = headerText
 
 proc parseInputChunks*(source, text, marker: string): seq[InputChunk] =
   let pieces = splitChunks(text, marker)
   for i in 0 ..< pieces.len:
     result.add(parseChunkBody(source, i + 1, pieces[i]))
 
-proc readInputText*(path: string): tuple[source, text: string] =
-  if not fileExists(path):
-    raise newException(ValueError, "input file does not exist: " & path)
-  result = (source: path, text: readFile(path))
-
 proc loadInputChunks*(path, marker: string): seq[InputChunk] =
-  let loaded = readInputText(path)
-  result = parseInputChunks(loaded.source, loaded.text, marker)
+  result = parseInputChunks(path, readFile(path), marker)

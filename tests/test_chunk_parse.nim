@@ -19,13 +19,13 @@ proc testPlainTextChunk() =
   doAssert chunk.metadataJson.len == 0
   doAssert chunk.text == "just text"
 
-proc testInvalidHeaderFallsBackToPlainText() =
+proc testOpaqueHeaderChunk() =
   let chunk = parseChunkBody("notes.txt", 4, "{oops}\n\nhello")
-  doAssert chunk.metadataJson.len == 0
-  doAssert chunk.text == "{oops}\n\nhello"
+  doAssert chunk.metadataJson == "{oops}"
+  doAssert chunk.text == "hello"
 
 when isMainModule:
   testJsonHeaderChunk()
   testArrayHeaderChunk()
   testPlainTextChunk()
-  testInvalidHeaderFallsBackToPlainText()
+  testOpaqueHeaderChunk()
