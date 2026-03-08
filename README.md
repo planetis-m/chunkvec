@@ -1,24 +1,24 @@
 # chunkvec
 
-Store embeddings for pre-chunked text in SQLite and search them locally with
-`sqlite-vector`.
+Ordered embedding ingest and local search for marked-up text files.
 
-`chunkvec` is a small two-command CLI for workflows where chunking already
-happened upstream. You give it one marked-up text file, it embeds each chunk
-through DeepInfra's OpenAI-compatible embeddings API, stores the rows in SQLite,
-and later answers similarity queries locally from that database.
+`chunkvec` reads text that already contains chunk boundaries via `<page ...>`
+markers, sends those chunks to DeepInfra's OpenAI-compatible embeddings API,
+stores the results in SQLite with `sqlite-vector`, and later answers semantic
+queries locally from that database.
 
-## Why try it?
+## Core guarantees
 
-- chunk boundaries stay under your control; `chunkvec` never re-chunks text
-- ingest preserves the original order with explicit `ordinal` values
-- per-chunk page metadata stays attached to rows
-- search does one remote embedding call, then runs nearest-neighbor lookup
+- input is one marked-up text file, output is one SQLite database
+- chunk order is preserved with explicit `ordinal` values
+- page and optional section metadata stay attached to each stored row
+- ingest does bounded in-flight embedding work with retry handling
+- search does one embedding request for the query, then nearest-neighbor lookup
   locally through `sqlite-vector`
 
 ## Design
 
-`chunkvec` follows the same small runtime shape as `chunktts`:
+`chunkvec` uses the same small two-command shape as `chunktts`:
 
 1. `chunkvec_ingest`:
 - reads one input text file
@@ -29,6 +29,7 @@ and later answers similarity queries locally from that database.
 
 2. `chunkvec_search`:
 - reads one query text file
+- optionally parses a leading `<search ...>` filter header
 - embeds that query through the same built-in model
 - prints top matches from the local SQLite database
 
@@ -127,7 +128,7 @@ Built-in defaults:
 - max retries: `5`
 - total timeout: `120000 ms`
 - top-k search results: `8`
-- sqlite-vector runtime path: the app directory, using the platform filename
+- `sqlite-vector` runtime path: the app directory, using the platform filename
 
 ## CLI
 
@@ -147,7 +148,7 @@ Built-in defaults:
 
 `chunkvec_ingest` requires every chunk to start with a `<page ...>` marker.
 
-Minimal chunks:
+Minimal example:
 
 ```text
 <page n=1>
@@ -275,5 +276,6 @@ nim test tests/ci.nims
 The test suite covers:
 
 - page-marker parsing
+- search-input parsing
 - request-id packing
 - SQLite plus `sqlite-vector` integration
