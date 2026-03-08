@@ -24,8 +24,8 @@ type
 
 const HelpText = """
 Usage:
-  chunkvec_ingest INPUT.txt DB.sqlite
-  chunkvec_search QUERY.txt DB.sqlite
+  cvstore INPUT.txt DB.sqlite
+  cvquery QUERY.txt DB.sqlite
 
 Options:
   --help, -h       Show this help and exit.

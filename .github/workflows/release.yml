@@ -50,17 +50,17 @@ jobs:
 
       - name: Build release binaries
         run: |
-          nim c -d:release -o:chunkvec_ingest src/chunkvec_ingest.nim
-          nim c -d:release -o:chunkvec_search src/chunkvec_search.nim
+          nim c -d:release -o:cvstore src/cvstore.nim
+          nim c -d:release -o:cvquery src/cvquery.nim
 
       - name: Strip executables
-        run: strip chunkvec_ingest chunkvec_search
+        run: strip cvstore cvquery
 
       - name: Create archive
         run: |
           mkdir -p dist
-          cp chunkvec_ingest dist/
-          cp chunkvec_search dist/
+          cp cvstore dist/
+          cp cvquery dist/
           cp config.json dist/
           cp LICENSE.md dist/
           cp README.md dist/
@@ -109,14 +109,14 @@ jobs:
 
       - name: Build release binaries
         run: |
-          nim c -d:release -o:chunkvec_ingest src/chunkvec_ingest.nim
-          nim c -d:release -o:chunkvec_search src/chunkvec_search.nim
+          nim c -d:release -o:cvstore src/cvstore.nim
+          nim c -d:release -o:cvquery src/cvquery.nim
 
       - name: Create archive
         run: |
           mkdir -p dist
-          cp chunkvec_ingest dist/
-          cp chunkvec_search dist/
+          cp cvstore dist/
+          cp cvquery dist/
           cp config.json dist/
           cp LICENSE.md dist/
           cp README.md dist/
@@ -176,8 +176,8 @@ jobs:
         env:
           VCPKG_ROOT: ${{ github.workspace }}\vcpkg\installed\x64-windows-release
         run: |
-          nim c -d:release -o:chunkvec_ingest.exe src/chunkvec_ingest.nim
-          nim c -d:release -o:chunkvec_search.exe src/chunkvec_search.nim
+          nim c -d:release -o:cvstore.exe src/cvstore.nim
+          nim c -d:release -o:cvquery.exe src/cvquery.nim
 
       - name: Create archive
         shell: pwsh
@@ -185,8 +185,8 @@ jobs:
           VCPKG_ROOT: ${{ github.workspace }}\vcpkg\installed\x64-windows-release
         run: |
           New-Item -ItemType Directory -Force -Path dist | Out-Null
-          Copy-Item chunkvec_ingest.exe dist\
-          Copy-Item chunkvec_search.exe dist\
+          Copy-Item cvstore.exe dist\
+          Copy-Item cvquery.exe dist\
           Copy-Item config.json dist\
           Copy-Item LICENSE.md dist\
           Copy-Item README.md dist\
@@ -234,7 +234,7 @@ jobs:
           - macOS arm64: chunkvec-macos-arm64.tar.gz
           - Windows x86_64: chunkvec-windows-x86_64.zip
 
-          Each archive includes the chunkvec_ingest and chunkvec_search executables,
+          Each archive includes the cvstore and cvquery executables,
           config.json, LICENSE.md, README.md, and the sqlite-vector runtime library beside the apps.
           The Windows archive also includes the required runtime DLLs from vcpkg.
           EOF

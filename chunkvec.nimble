@@ -1,9 +1,9 @@
-version       = "0.2.0"
+version       = "0.2.1"
 author        = "planetis"
 description   = "Store and search embeddings for pre-chunked text with SQLite vector search"
 license       = "AGPL-3.0"
 srcDir        = "src"
-bin           = @["chunkvec_ingest", "chunkvec_search"]
+bin           = @["cvstore", "cvquery"]
 
 requires "nim >= 2.2.8"
 requires "db_connector"

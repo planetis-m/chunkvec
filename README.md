@@ -20,14 +20,14 @@ queries locally from that database.
 
 `chunkvec` uses the same small two-command shape as `chunktts`:
 
-1. `chunkvec_ingest`:
+1. `cvstore`:
 - reads one input text file
 - parses required leading `<chunk ...>` markers
 - sends embedding requests with bounded in-flight work and retries
 - inserts successful chunks into SQLite in original order
 - initializes and quantizes the `sqlite-vector` column
 
-2. `chunkvec_search`:
+2. `cvquery`:
 - reads one query text file
 - optionally parses a leading `<search ...>` filter header
 - embeds that query through the same built-in model
@@ -50,7 +50,7 @@ Runtime dependencies:
 - macOS: `curl` and `sqlite`
 - Windows: no extra runtime install if the archive bundles the required DLLs
 
-Keep `chunkvec_ingest`, `chunkvec_search`, `config.json`, and the platform
+Keep `cvstore`, `cvquery`, `config.json`, and the platform
 `vector` runtime library in the same directory.
 
 ### Build from source
@@ -62,8 +62,8 @@ Keep `chunkvec_ingest`, `chunkvec_search`, `config.json`, and the platform
 sudo apt-get update
 sudo apt-get install -y libcurl4-openssl-dev sqlite3 libsqlite3-dev
 atlas install
-nim c -d:release -o:chunkvec_ingest src/chunkvec_ingest.nim
-nim c -d:release -o:chunkvec_search src/chunkvec_search.nim
+nim c -d:release -o:cvstore src/cvstore.nim
+nim c -d:release -o:cvquery src/cvquery.nim
 cp third_party/sqlite/vector.so .
 ```
 
@@ -75,8 +75,8 @@ cp third_party/sqlite/vector.so .
 ```bash
 brew install curl sqlite
 atlas install
-nim c -d:release -o:chunkvec_ingest src/chunkvec_ingest.nim
-nim c -d:release -o:chunkvec_search src/chunkvec_search.nim
+nim c -d:release -o:cvstore src/cvstore.nim
+nim c -d:release -o:cvquery src/cvquery.nim
 # Place vector.dylib beside the two executables.
 ```
 
@@ -87,8 +87,8 @@ nim c -d:release -o:chunkvec_search src/chunkvec_search.nim
 
 ```powershell
 atlas install
-nim c -d:release -o:chunkvec_ingest.exe src/chunkvec_ingest.nim
-nim c -d:release -o:chunkvec_search.exe src/chunkvec_search.nim
+nim c -d:release -o:cvstore.exe src/cvstore.nim
+nim c -d:release -o:cvquery.exe src/cvquery.nim
 # Place vector.dll beside the two executables.
 ```
 
@@ -138,20 +138,20 @@ Built-in defaults:
 ## CLI
 
 ```bash
-./chunkvec_ingest INPUT.txt DB.sqlite
-./chunkvec_search QUERY.txt DB.sqlite
-./chunkvec_ingest --help
-./chunkvec_search --help
+./cvstore INPUT.txt DB.sqlite
+./cvquery QUERY.txt DB.sqlite
+./cvstore --help
+./cvquery --help
 ```
 
-- `chunkvec_ingest` takes `INPUT.txt DB.sqlite`
-- `chunkvec_search` takes `QUERY.txt DB.sqlite`
+- `cvstore` takes `INPUT.txt DB.sqlite`
+- `cvquery` takes `QUERY.txt DB.sqlite`
 - `stdout` is used only for search results
 - logs and fatal errors go to `stderr`
 
 ## Input format
 
-`chunkvec_ingest` requires every chunk to start with a `<chunk ...>` marker.
+`cvstore` requires every chunk to start with a `<chunk ...>` marker.
 Existing `<page ...>` inputs and databases must be regenerated for this format.
 
 Minimal example:
@@ -227,16 +227,16 @@ export DEEPINFRA_API_KEY=...
 Ingest:
 
 ```bash
-./chunkvec_ingest notes.txt notes.sqlite
+./cvstore notes.txt notes.sqlite
 ```
 
 Search:
 
 ```bash
-./chunkvec_search query.txt notes.sqlite
+./cvquery query.txt notes.sqlite
 ```
 
-`chunkvec_search` accepts either:
+`cvquery` accepts either:
 
 - a plain query file containing only the semantic query text
 - or an optional leading `<search ...>` header followed by a blank line and the
