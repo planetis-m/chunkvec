@@ -104,13 +104,18 @@ proc buildRuntimeConfig(): RuntimeConfig =
   )
 
 proc parseIngestCliArgs(cliArgs: seq[string]): tuple[inputPath, dbPath: string] =
+  result = (inputPath: "", dbPath: "")
   var parser = initOptParser(cliArgs)
-  var positional: seq[string]
 
   for kind, key, val in parser.getopt():
     case kind
     of cmdArgument:
-      positional.add(parser.key)
+      if result.inputPath.len == 0:
+        result.inputPath = parser.key
+      elif result.dbPath.len == 0:
+        result.dbPath = parser.key
+      else:
+        cliError("too many positional arguments", IngestHelpText)
     of cmdLongOption:
       if key == "help":
         quit(IngestHelpText, ExitAllOk)
@@ -124,12 +129,10 @@ proc parseIngestCliArgs(cliArgs: seq[string]): tuple[inputPath, dbPath: string] 
     of cmdEnd:
       discard
 
-  if positional.len < 2:
-    cliError("missing required INPUT and DB arguments", IngestHelpText)
-  if positional.len > 2:
-    cliError("too many positional arguments", IngestHelpText)
-
-  result = (inputPath: positional[0], dbPath: positional[1])
+  if result.inputPath.len == 0:
+    cliError("missing required INPUT.txt argument", IngestHelpText)
+  if result.dbPath.len == 0:
+    cliError("missing required DB.sqlite argument", IngestHelpText)
 
 proc parseSearchCliArgs(cliArgs: seq[string]): tuple[dbPath, queryPath: string] =
   var parser = initOptParser(cliArgs)
