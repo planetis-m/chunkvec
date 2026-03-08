@@ -1,16 +1,26 @@
 import openai/core
 
 const
-  NoPageFilter* = -1
+  NoPositionFilter* = -1
 
 type
+  ChunkKind* = enum
+    none,
+    source,
+    derived,
+    assessment
+
   ChunkMetadata* = object
-    pageNumber*: int
-    section*: string
+    docId*: string
+    kind*: ChunkKind
+    position*: int
+    label*: string
 
   SearchFilters* = object
-    pageNumber*: int = NoPageFilter
-    sectionSubstring*: string
+    docId*: string
+    kind*: ChunkKind
+    position*: int = NoPositionFilter
+    labelSubstring*: string
 
   SearchInput* = object
     queryText*: string
@@ -73,8 +83,25 @@ type
     text*: string
     metadata*: ChunkMetadata
 
+proc parseChunkKind*(text: string): ChunkKind {.inline.} =
+  case text
+  of "source":
+    result = source
+  of "derived":
+    result = derived
+  of "assessment":
+    result = assessment
+  else:
+    result = none
+
 proc initSearchFilters*(): SearchFilters {.inline.} =
-  result = SearchFilters(pageNumber: NoPageFilter, sectionSubstring: "")
+  result = SearchFilters(
+    docId: "",
+    kind: none,
+    position: NoPositionFilter,
+    labelSubstring: ""
+  )
 
 proc hasFilters*(filters: SearchFilters): bool {.inline.} =
-  result = filters.pageNumber != NoPageFilter or filters.sectionSubstring.len > 0
+  result = filters.docId.len > 0 or filters.kind != none or
+    filters.position != NoPositionFilter or filters.labelSubstring.len > 0

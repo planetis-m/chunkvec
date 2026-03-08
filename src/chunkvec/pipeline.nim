@@ -70,8 +70,10 @@ proc flushOrderedResults(db: DbConn; insertStmt: SqlPrepared; state: var Pipelin
         record.chunk.ordinal,
         record.chunk.text,
         record.embedding,
-        record.chunk.metadata.pageNumber,
-        record.chunk.metadata.section
+        record.chunk.metadata.docId,
+        $record.chunk.metadata.kind,
+        record.chunk.metadata.position,
+        record.chunk.metadata.label
       )
       state.wroteRows = true
 
@@ -127,7 +129,7 @@ proc submitFreshAttempts(cfg: RuntimeConfig; chunks: seq[InputChunk]; maxInFligh
         dec state.activeCount
       inc state.nextSubmitSeqId
 
-proc processEmbeddingSuccess(chunks: seq[InputChunk]; embeddingDimension, seqId, attempt: int;
+proc processEmbeddingSuccess(cfg: RuntimeConfig; chunks: seq[InputChunk]; seqId, attempt: int;
     body: string; state: var PipelineState) =
   var parsed: EmbeddingCreateResult
   if not embeddingParse(body, parsed):
@@ -144,11 +146,11 @@ proc processEmbeddingSuccess(chunks: seq[InputChunk]; embeddingDimension, seqId,
     )
   else:
     let embeddingLen = embedding(parsed).len
-    if embeddingLen != embeddingDimension:
+    if embeddingLen != cfg.embeddingDimension:
       state.staged[seqId] = errorChunkResult(
         attempts = attempt,
         kind = PayloadError,
-        message = "embedding dimension mismatch: expected " & $embeddingDimension &
+        message = "embedding dimension mismatch: expected " & $cfg.embeddingDimension &
           ", got " & $embeddingLen
       )
     else:
@@ -183,7 +185,7 @@ proc processResult(cfg: RuntimeConfig; chunks: seq[InputChunk]; item: RequestRes
         httpStatus = finalError.httpStatus
       )
     else:
-      processEmbeddingSuccess(chunks, cfg.embeddingDimension, seqId, attempt, item.response.body, state)
+      processEmbeddingSuccess(cfg, chunks, seqId, attempt, item.response.body, state)
     dec state.activeCount
 
 proc drainReadyResults(cfg: RuntimeConfig; chunks: seq[InputChunk]; client: Relay;

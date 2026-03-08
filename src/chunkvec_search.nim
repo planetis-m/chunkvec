@@ -12,11 +12,13 @@ proc shutdownRelay(client: Relay; shouldAbort: bool) =
 proc renderResult(row: SearchResult; rank: int) =
   let header = $rank & ". distance=" & formatFloat(row.distance, ffDecimal, 6) &
     " source=" & row.source & " ordinal=" & $row.ordinal &
-    " page=" & $row.metadata.pageNumber
-  if row.metadata.section.len == 0:
+    " doc=\"" & row.metadata.docId & "\"" &
+    " kind=" & $row.metadata.kind &
+    " position=" & $row.metadata.position
+  if row.metadata.label.len == 0:
     echo header
   else:
-    echo header, " section=\"", row.metadata.section, "\""
+    echo header, " label=\"", row.metadata.label, "\""
   echo row.text
 
 proc runSearchApp*(): int =

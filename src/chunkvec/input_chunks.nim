@@ -2,8 +2,8 @@ import std/[parseutils, strutils]
 import ./[marker_parser, types]
 
 const
-  PageMarkerName = "page"
-  PageMarkerPrefix = "<page"
+  ChunkMarkerName = "chunk"
+  ChunkMarkerPrefix = "<chunk"
 
 proc trimChunkBounds(text: string; startPos, endPos: int): Slice[int] =
   var first = startPos
@@ -16,35 +16,63 @@ proc trimChunkBounds(text: string; startPos, endPos: int): Slice[int] =
 
   result = first ..< last
 
-proc parsePageMarker(source: string; text: string; metadata: var ChunkMetadata;
-    startPos: int): int =
-  var page = 0
-  var havePage = false
-  var section = ""
+proc parseChunkMarker(text: string; metadata: var ChunkMetadata; startPos: int): int =
+  var docId = ""
+  var haveDocId = false
+  var kind = ChunkKind.none
+  var haveKind = false
+  var position = 0
+  var havePosition = false
+  var label = ""
 
-  proc parsePageAttr(attrName: string; text: string; pos: var int) =
+  proc parseChunkAttr(attrName: string; text: string; pos: var int) =
     case attrName
-    of "n":
-      let parsed = parseInt(text, page, pos)
+    of "doc":
+      let parsed = parseQuotedValue(text, docId, pos)
       if parsed == 0:
-        failParse(source, "input", "n must be an integer")
-      havePage = true
+        failParse("doc must use a double-quoted string")
+      haveDocId = true
       pos.inc(parsed)
-    of "section":
-      let parsed = parseQuotedValue(text, section, pos)
+    of "kind":
+      var kindName = ""
+      let parsed = parseIdent(text, kindName, pos)
+      kind = parseChunkKind(kindName)
+      if parsed == 0 or kind == ChunkKind.none:
+        failParse("kind must be one of source, derived, assessment")
+      haveKind = true
+      pos.inc(parsed)
+    of "position":
+      let parsed = parseInt(text, position, pos)
       if parsed == 0:
-        failParse(source, "input", "section must use a double-quoted string")
+        failParse("position must be an integer")
+      havePosition = true
+      pos.inc(parsed)
+    of "label":
+      let parsed = parseQuotedValue(text, label, pos)
+      if parsed == 0:
+        failParse("label must use a double-quoted string")
       pos.inc(parsed)
     else:
-      failParse(source, "input", "unknown attribute " & attrName)
+      failParse("unknown attribute " & attrName)
 
-  let parsedLen = parseMarker(text, startPos, PageMarkerName, parsePageAttr)
+  let parsedLen = parseMarker(text, startPos, ChunkMarkerName, parseChunkAttr)
   if parsedLen == 0:
     return 0
-  if not havePage:
-    failParse(source, "input", "missing required n attribute")
+  if not haveDocId:
+    failParse("missing required doc attribute")
+  if docId.len == 0:
+    failParse("doc must not be empty")
+  if not haveKind:
+    failParse("missing required kind attribute")
+  if not havePosition:
+    failParse("missing required position attribute")
 
-  metadata = ChunkMetadata(pageNumber: page, section: section)
+  metadata = ChunkMetadata(
+    docId: docId,
+    kind: kind,
+    position: position,
+    label: label
+  )
   result = parsedLen
 
 proc parseInputChunks*(source, text: string): seq[InputChunk] =
@@ -52,19 +80,19 @@ proc parseInputChunks*(source, text: string): seq[InputChunk] =
   var ordinal = 1
 
   while pos < text.len:
-    if not markerAtLineStart(text, pos, PageMarkerPrefix):
-      failParse(source, "input", "missing <page ...> marker")
+    if not markerAtLineStart(text, pos, ChunkMarkerPrefix):
+      failParse("missing <chunk ...> marker")
 
     var metadata: ChunkMetadata
-    let markerLen = parsePageMarker(source, text, metadata, pos)
+    let markerLen = parseChunkMarker(text, metadata, pos)
     if markerLen == 0:
-      failParse(source, "input", "expected <page ...> marker")
+      failParse("expected <chunk ...> marker")
 
     let bodyStart = pos + markerLen
-    let nextMarkerPos = findNextMarker(text, bodyStart, PageMarkerPrefix)
+    let nextMarkerPos = findNextMarker(text, bodyStart, ChunkMarkerPrefix)
     let bodyBounds = trimChunkBounds(text, bodyStart, nextMarkerPos)
     if bodyBounds.a >= bodyBounds.b:
-      failParse(source, "input", "chunk body is empty")
+      failParse("chunk body is empty")
 
     result.add(InputChunk(
       source: source,

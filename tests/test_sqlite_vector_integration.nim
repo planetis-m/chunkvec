@@ -20,7 +20,7 @@ proc testSqliteVectorRoundTrip() =
 
   db.loadExtension(extPath)
   db.initSchema()
-  db.initializeVectorTable()
+  db.initializeVectorTable(EmbeddingDimension)
 
   var stmt = db.prepareInsertStatement()
   defer: stmt.finalize()
@@ -32,6 +32,8 @@ proc testSqliteVectorRoundTrip() =
     1,
     "alpha",
     unitVector(0),
+    "ml-unit-1",
+    "source",
     7,
     "Intro_Basics"
   )
@@ -41,6 +43,8 @@ proc testSqliteVectorRoundTrip() =
     2,
     "beta",
     unitVector(1),
+    "ml-unit-1",
+    "derived",
     8,
     "Appendix"
   )
@@ -50,6 +54,8 @@ proc testSqliteVectorRoundTrip() =
     3,
     "gamma",
     unitVector(0),
+    "ml-unit-2",
+    "assessment",
     7,
     "Deep Intro"
   )
@@ -59,23 +65,35 @@ proc testSqliteVectorRoundTrip() =
   let rows = db.searchChunks(unitVector(0), 1)
   doAssert rows.len == 1
   doAssert rows[0].text == "alpha"
-  doAssert rows[0].metadata == ChunkMetadata(pageNumber: 7, section: "Intro_Basics")
+  doAssert rows[0].metadata == ChunkMetadata(
+    docId: "ml-unit-1",
+    kind: source,
+    position: 7,
+    label: "Intro_Basics"
+  )
 
-  let pageRows = db.searchChunks(unitVector(0), 3,
-    SearchFilters(pageNumber: 7))
-  doAssert pageRows.len == 2
-  doAssert pageRows[0].metadata.pageNumber == 7
-  doAssert pageRows[1].metadata.pageNumber == 7
+  let docRows = db.searchChunks(unitVector(0), 3,
+    SearchFilters(docId: "ml-unit-1"))
+  doAssert docRows.len == 2
+  doAssert docRows[0].metadata.docId == "ml-unit-1"
+  doAssert docRows[1].metadata.docId == "ml-unit-1"
 
-  let sectionRows = db.searchChunks(unitVector(0), 3,
-    SearchFilters(sectionSubstring: "introbas"))
-  doAssert sectionRows.len == 1
-  doAssert sectionRows[0].text == "alpha"
+  let kindRows = db.searchChunks(unitVector(0), 3,
+    SearchFilters(kind: assessment))
+  doAssert kindRows.len == 1
+  doAssert kindRows[0].text == "gamma"
+
+  let labelRows = db.searchChunks(unitVector(0), 3,
+    SearchFilters(labelSubstring: "introbas"))
+  doAssert labelRows.len == 1
+  doAssert labelRows[0].text == "alpha"
 
   let combinedRows = db.searchChunks(unitVector(0), 3,
     SearchFilters(
-      pageNumber: 7,
-      sectionSubstring: "deep intro"
+      docId: "ml-unit-2",
+      kind: assessment,
+      position: 7,
+      labelSubstring: "deep intro"
     ))
   doAssert combinedRows.len == 1
   doAssert combinedRows[0].text == "gamma"

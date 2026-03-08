@@ -2,7 +2,7 @@
 
 Ordered embedding ingest and local search for marked-up text files.
 
-`chunkvec` reads text that already contains chunk boundaries via `<page ...>`
+`chunkvec` reads text that already contains chunk boundaries via `<chunk ...>`
 markers, sends those chunks to DeepInfra's OpenAI-compatible embeddings API,
 stores the results in SQLite with `sqlite-vector`, and later answers semantic
 queries locally from that database.
@@ -11,7 +11,7 @@ queries locally from that database.
 
 - input is one marked-up text file, output is one SQLite database
 - chunk order is preserved with explicit `ordinal` values
-- page and optional section metadata stay attached to each stored row
+- doc, kind, position, and optional label metadata stay attached to each stored row
 - ingest does bounded in-flight embedding work with retry handling
 - search does one embedding request for the query, then nearest-neighbor lookup
   locally through `sqlite-vector`
@@ -22,7 +22,7 @@ queries locally from that database.
 
 1. `chunkvec_ingest`:
 - reads one input text file
-- parses required leading `<page ...>` markers
+- parses required leading `<chunk ...>` markers
 - sends embedding requests with bounded in-flight work and retries
 - inserts successful chunks into SQLite in original order
 - initializes and quantizes the `sqlite-vector` column
@@ -151,37 +151,40 @@ Built-in defaults:
 
 ## Input format
 
-`chunkvec_ingest` requires every chunk to start with a `<page ...>` marker.
+`chunkvec_ingest` requires every chunk to start with a `<chunk ...>` marker.
+Existing `<page ...>` inputs and databases must be regenerated for this format.
 
 Minimal example:
 
 ```text
-<page n=1>
+<chunk doc="sample-book" kind=source position=1>
 First chunk.
 
-<page n=2>
+<chunk doc="sample-book" kind=source position=2>
 Second chunk.
 
-<page n=3>
+<chunk doc="sample-book" kind=source position=3>
 Third chunk.
 ```
 
-Page plus section metadata:
+Input with label metadata:
 
 ```text
-<page n=12 section="Backpropagation">
+<chunk doc="ml-book" kind=source position=12 label="Backpropagation">
 Gradient descent updates weights using the negative gradient.
 
-<page n=13 section="Regularization">
+<chunk doc="ml-book" kind=source position=13 label="Regularization">
 Dropout disables random activations during training.
 ```
 
 Rules:
 
 - leading file whitespace before the first marker is ignored
-- every chunk must start with `<page ...>`
-- `n` is required and must be an integer
-- `section` is optional and must be double-quoted when present
+- every chunk must start with `<chunk ...>`
+- `doc` is required and must be a non-empty double-quoted string
+- `kind` is required and must be one of `source`, `derived`, `assessment`
+- `position` is required and must be an integer
+- `label` is optional and must be double-quoted when present
 - unknown marker attributes are rejected
 - surrounding whitespace around each chunk body is trimmed
 - empty chunk bodies are rejected
@@ -191,13 +194,13 @@ Rules:
 Prepare an input file:
 
 ```text
-<page n=4 section="Embeddings">
+<chunk doc="notes-course" kind=source position=4 label="Embeddings">
 Embeddings map text into vectors where similar meanings stay close.
 
-<page n=5 section="Vector Search">
+<chunk doc="notes-course" kind=source position=5 label="Vector Search">
 Nearest-neighbor search compares a query vector against stored vectors.
 
-<page n=6>
+<chunk doc="notes-course" kind=derived position=6>
 Use cosine distance when direction matters more than magnitude.
 ```
 
@@ -210,7 +213,7 @@ How do embeddings help search?
 Filtered query example:
 
 ```text
-<search page=5 section="vector_search">
+<search doc="notes-course" kind=source position=5 label="vector_search">
 
 How do embeddings help search?
 ```
@@ -241,19 +244,21 @@ Search:
 
 Search filter rules:
 
-- `page` is an exact single-page filter
-- `section` is a substring filter after `strutils.normalize` on both sides
+- `doc` is an exact match filter on the logical material id
+- `kind` is an exact match filter on `source`, `derived`, or `assessment`
+- `position` is an exact integer filter
+- `label` is a substring filter after `strutils.normalize` on both sides
 - `strutils.normalize` lowercases ASCII and removes `_`
-- if both filters are present, both must match
+- if multiple filters are present, all must match
 - query text is still required even when filters are present
 
 Typical output:
 
 ```text
-1. distance=0.123456 source=notes.txt ordinal=1 page=4 section="Embeddings"
+1. distance=0.123456 source=notes.txt ordinal=1 doc="notes-course" kind=source position=4 label="Embeddings"
 Embeddings map text into vectors where similar meanings stay close.
 
-2. distance=0.187654 source=notes.txt ordinal=2 page=5 section="Vector Search"
+2. distance=0.187654 source=notes.txt ordinal=2 doc="notes-course" kind=source position=5 label="Vector Search"
 Nearest-neighbor search compares a query vector against stored vectors.
 ```
 
@@ -280,7 +285,7 @@ nim test tests/ci.nims
 
 The test suite covers:
 
-- page-marker parsing
+- chunk-marker parsing
 - search-input parsing
 - request-id packing
 - SQLite plus `sqlite-vector` integration

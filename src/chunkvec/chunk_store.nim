@@ -65,14 +65,20 @@ proc initSchema*(db: DbConn) =
   ordinal INTEGER NOT NULL,
   text TEXT NOT NULL,
   """ & EmbeddingColumn & """ BLOB NOT NULL,
-  page_number INTEGER NOT NULL,
-  section TEXT NOT NULL,
+  doc_id TEXT NOT NULL,
+  kind TEXT NOT NULL CHECK (kind IN ('source', 'derived', 'assessment')),
+  position INTEGER NOT NULL,
+  label TEXT NOT NULL,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );"""
   ))
   db.exec(sql(
     """CREATE INDEX IF NOT EXISTS idx_chunks_source_ordinal
   ON """ & TableName & """(source, ordinal);"""
+  ))
+  db.exec(sql(
+    """CREATE INDEX IF NOT EXISTS idx_chunks_doc_kind_position
+  ON """ & TableName & """(doc_id, kind, position);"""
   ))
 
 proc beginTransaction*(db: DbConn) =
@@ -98,9 +104,11 @@ proc prepareInsertStatement*(db: DbConn): SqlPrepared =
   ordinal,
   text,
   """ & EmbeddingColumn & """,
-  page_number,
-  section
-) VALUES (?, ?, ?, ?, ?, ?);
+  doc_id,
+  kind,
+  position,
+  label
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
 """
   )
 
@@ -120,8 +128,10 @@ proc readSearchResult(row: InstantRow): SearchResult =
     ordinal: sqlite3.column_int(row, 3).int,
     text: row.textColumn(4),
     metadata: ChunkMetadata(
-      pageNumber: sqlite3.column_int(row, 5).int,
-      section: row.textColumn(6)
+      docId: row.textColumn(5),
+      kind: parseChunkKind(row.textColumn(6)),
+      position: sqlite3.column_int(row, 7).int,
+      label: row.textColumn(8)
     )
   )
 
@@ -133,8 +143,10 @@ proc runTopKSearch(db: DbConn; queryVector: seq[float32]; topK: int): seq[Search
   c.source,
   c.ordinal,
   c.text,
-  c.page_number,
-  c.section
+  c.doc_id,
+  c.kind,
+  c.position,
+  c.label
 FROM """ & TableName & """ AS c
 JOIN vector_quantize_scan('""" & TableName & """', '""" &
     EmbeddingColumn & """', ?, ?) AS v
@@ -154,8 +166,15 @@ ORDER BY v.distance ASC, c.id ASC;
     if not stmt.isNil:
       stmt.finalize()
 
-proc normalizedSectionExpr(column: string): string =
+proc normalizedLabelExpr(column: string): string =
   result = "lower(replace(" & column & ", '_', ''))"
+
+template addWherePrefix() =
+  if haveWhereClause:
+    query.add("AND ")
+  else:
+    query.add("WHERE ")
+    haveWhereClause = true
 
 proc runFilteredSearch(db: DbConn; queryVector: seq[float32]; filters: SearchFilters;
     topK: int): seq[SearchResult] =
@@ -166,8 +185,10 @@ proc runFilteredSearch(db: DbConn; queryVector: seq[float32]; filters: SearchFil
   c.source,
   c.ordinal,
   c.text,
-  c.page_number,
-  c.section
+  c.doc_id,
+  c.kind,
+  c.position,
+  c.label
 FROM """ & TableName & """ AS c
 JOIN vector_quantize_scan('""" & TableName & """', '""" &
     EmbeddingColumn & """', ?) AS v
@@ -175,20 +196,23 @@ JOIN vector_quantize_scan('""" & TableName & """', '""" &
 """
 
   var haveWhereClause = false
-  if filters.pageNumber != NoPageFilter:
-    query.add("WHERE c.page_number = ?\n")
+  if filters.docId.len > 0:
+    query.add("WHERE c.doc_id = ?\n")
     haveWhereClause = true
-  if filters.sectionSubstring.len > 0:
-    if haveWhereClause:
-      query.add("AND ")
-    else:
-      query.add("WHERE ")
-    query.add("instr(" & normalizedSectionExpr("c.section") & ", ?) > 0\n")
+  if filters.kind != none:
+    addWherePrefix()
+    query.add("c.kind = ?\n")
+  if filters.position != NoPositionFilter:
+    addWherePrefix()
+    query.add("c.position = ?\n")
+  if filters.labelSubstring.len > 0:
+    addWherePrefix()
+    query.add("instr(" & normalizedLabelExpr("c.label") & ", ?) > 0\n")
 
   query.add("ORDER BY v.distance ASC, c.id ASC\n")
   query.add("LIMIT ?;")
 
-  let normalizedSection = filters.sectionSubstring.normalize()
+  let normalizedLabel = filters.labelSubstring.normalize()
 
   var stmt: SqlPrepared
   try:
@@ -196,11 +220,17 @@ JOIN vector_quantize_scan('""" & TableName & """', '""" &
     var paramIdx = 1
     stmt.bindParam(paramIdx, queryVector)
     inc paramIdx
-    if filters.pageNumber != NoPageFilter:
-      stmt.bindParam(paramIdx, filters.pageNumber)
+    if filters.docId.len > 0:
+      stmt.bindParam(paramIdx, filters.docId)
       inc paramIdx
-    if filters.sectionSubstring.len > 0:
-      stmt.bindParam(paramIdx, normalizedSection)
+    if filters.kind != none:
+      stmt.bindParam(paramIdx, $filters.kind)
+      inc paramIdx
+    if filters.position != NoPositionFilter:
+      stmt.bindParam(paramIdx, filters.position)
+      inc paramIdx
+    if filters.labelSubstring.len > 0:
+      stmt.bindParam(paramIdx, normalizedLabel)
       inc paramIdx
     stmt.bindParam(paramIdx, topK)
 
