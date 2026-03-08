@@ -19,7 +19,7 @@ type
     remaining: int
     submitBatch: RequestBatch
     allSucceeded: bool
-    insertedCount: int
+    wroteRows: bool
     rng: Rand
 
 proc okChunkResult(attempts: int): ChunkResult {.inline.} =
@@ -53,7 +53,7 @@ proc initPipelineState(total: int): PipelineState =
     remaining: total,
     submitBatch: RequestBatch(),
     allSucceeded: true,
-    insertedCount: 0,
+    wroteRows: false,
     rng: initRand(getMonoTime().ticks)
   )
 
@@ -72,7 +72,7 @@ proc flushOrderedResults(db: DbConn; insertStmt: SqlPrepared; cfg: RuntimeConfig
       else:
         dbMeta.ensureMetadataCompatible(cfg.networkConfig.model, record.dimension)
       db.insertChunk(insertStmt, record)
-      inc state.insertedCount
+      state.wroteRows = true
 
     state.staged[state.nextFinalizeSeqId] = default(ChunkResult)
     state.records[state.nextFinalizeSeqId] = default(ChunkRecord)
@@ -220,9 +220,7 @@ proc waitForProgress(cfg: RuntimeConfig; chunks: seq[InputChunk]; client: Relay;
 
 proc runPipeline*(cfg: RuntimeConfig; chunks: seq[InputChunk]; client: Relay;
     db: DbConn; insertStmt: SqlPrepared; dbMeta: var DbMetadata): tuple[
-      allSucceeded: bool,
-      insertedCount: int
-    ] =
+      allSucceeded: bool, wroteRows: bool] =
   let total = chunks.len
   let maxInFlight = max(1, cfg.networkConfig.maxInflight)
   let maxAttempts = max(1, cfg.networkConfig.maxRetries + 1)
@@ -244,4 +242,4 @@ proc runPipeline*(cfg: RuntimeConfig; chunks: seq[InputChunk]; client: Relay;
       waitForProgress(cfg, chunks, client, maxInFlight, maxAttempts, retryPolicy, state)
       flushOrderedResults(db, insertStmt, cfg, state, dbMeta)
 
-  result = (allSucceeded: state.allSucceeded, insertedCount: state.insertedCount)
+  result = (allSucceeded: state.allSucceeded, wroteRows: state.wroteRows)

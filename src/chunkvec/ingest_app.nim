@@ -46,22 +46,24 @@ proc runIngestApp*(): int =
       db.initializeVectorTable(dbMeta)
 
     var insertStmt = db.prepareInsertStatement()
-    defer: insertStmt.finalize()
+    var pipelineResult: tuple[allSucceeded: bool, wroteRows: bool]
+    try:
+      db.beginTransaction()
+      transactionOpen = true
 
-    db.beginTransaction()
-    transactionOpen = true
+      client = newRelay(
+        maxInFlight = cfg.networkConfig.maxInflight,
+        defaultTimeoutMs = cfg.networkConfig.totalTimeoutMs
+      )
 
-    client = newRelay(
-      maxInFlight = cfg.networkConfig.maxInflight,
-      defaultTimeoutMs = cfg.networkConfig.totalTimeoutMs
-    )
+      pipelineResult = runPipeline(cfg, chunks, client, db, insertStmt, dbMeta)
 
-    let pipelineResult = runPipeline(cfg, chunks, client, db, insertStmt, dbMeta)
+      db.commitTransaction()
+      transactionOpen = false
+    finally:
+      insertStmt.finalize()
 
-    db.commitTransaction()
-    transactionOpen = false
-
-    if pipelineResult.insertedCount > 0 and dbMeta.initialized:
+    if pipelineResult.wroteRows and dbMeta.initialized:
       db.initializeVectorTable(dbMeta)
       db.rebuildQuantization(dbMeta)
 
