@@ -3,7 +3,7 @@ import ./[constants, types]
 
 proc buildEmbeddingParams*(cfg: RuntimeConfig; text: sink string): EmbeddingCreateParams =
   embeddingCreate(
-    model = cfg.networkConfig.model,
+    model = Model,
     input = text,
     encodingFormat = EncodingFormat
   )

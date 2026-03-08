@@ -11,7 +11,6 @@ type
   JsonRuntimeConfig = object
     api_key: string
     api_url: string
-    model: string
     max_inflight: int
     max_retries: int
     total_timeout_ms: int
@@ -41,7 +40,6 @@ proc defaultJsonRuntimeConfig(): JsonRuntimeConfig =
   JsonRuntimeConfig(
     api_key: "",
     api_url: ApiUrl,
-    model: Model,
     max_inflight: MaxInflight,
     max_retries: MaxRetries,
     total_timeout_ms: TotalTimeoutMs,
@@ -92,7 +90,6 @@ proc buildRuntimeConfig(): RuntimeConfig =
       apiKey: resolvedApiKey
     ),
     networkConfig: NetworkConfig(
-      model: ifNonEmpty(rawConfig.model, Model),
       maxInflight: ifPositive(rawConfig.max_inflight, MaxInflight),
       totalTimeoutMs: ifPositive(rawConfig.total_timeout_ms, TotalTimeoutMs),
       maxRetries: ifNonNegative(rawConfig.max_retries, MaxRetries),

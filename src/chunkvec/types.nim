@@ -2,7 +2,6 @@ import openai/core
 
 type
   NetworkConfig* = object
-    model*: string
     maxInflight*: int
     totalTimeoutMs*: int
     maxRetries*: int
@@ -38,7 +37,6 @@ type
   ChunkRecord* = object
     chunk*: InputChunk
     embedding*: seq[float32]
-    dimension*: int
 
   ChunkErrorKind* = enum
     NoError,
@@ -60,14 +58,6 @@ type
     errorKind*: ChunkErrorKind
     errorMessage*: string
     httpStatus*: int
-
-  DbMetadata* = object
-    initialized*: bool
-    model*: string
-    dimension*: int
-    distance*: string
-    qtype*: string
-
   SearchResult* = object
     id*: int64
     distance*: float

@@ -10,12 +10,6 @@ proc shutdownRelay(client: Relay; shouldAbort: bool) =
   else:
     client.close()
 
-proc requireSearchReady(meta: DbMetadata; model: string; dimension: int) =
-  if not meta.initialized:
-    raise newException(ValueError,
-      "database does not contain embedding metadata; ingest chunks first")
-  meta.ensureMetadataCompatible(model, dimension)
-
 proc renderResult(row: SearchResult; rank: int) =
   var header = $rank & ". distance=" & formatFloat(row.distance, ffDecimal, 6) &
     " source=" & row.source & " ordinal=" & $row.ordinal
@@ -75,15 +69,16 @@ proc runSearchApp*(): int =
       raise newException(ValueError, "embeddings response had no vectors")
 
     let queryVector = embedding(parsed)
+    if queryVector.len != EmbeddingDimension:
+      raise newException(ValueError,
+        "embedding dimension mismatch: expected " & $EmbeddingDimension &
+        ", got " & $queryVector.len)
 
     db = openDatabase(cli.dbPath)
     dbOpened = true
     db.loadExtension(cfg.sqliteConfig.extensionPath)
     db.initSchema()
-
-    let meta = db.readMetadata()
-    requireSearchReady(meta, cfg.networkConfig.model, queryVector.len)
-    db.initializeVectorTable(meta)
+    db.initializeVectorTable()
 
     let rows = db.searchChunks(queryVector, cfg.networkConfig.topK)
     for i in 0 ..< rows.len:

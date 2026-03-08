@@ -1,5 +1,9 @@
 import std/os
-import ../src/chunkvec/[chunk_store, sqlite_vector_paths, types]
+import ../src/chunkvec/[chunk_store, constants, sqlite_vector_paths, types]
+
+proc unitVector(index: int): seq[float32] =
+  result = newSeq[float32](EmbeddingDimension)
+  result[index] = 1.0'f32
 
 proc testSqliteVectorRoundTrip() =
   let repoRoot = getCurrentDir()
@@ -16,10 +20,7 @@ proc testSqliteVectorRoundTrip() =
 
   db.loadExtension(extPath)
   db.initSchema()
-
-  let meta = configuredMetadata("Qwen/Qwen3-Embedding-0.6B", 3)
-  db.writeMetadata(meta)
-  db.initializeVectorTable(meta)
+  db.initializeVectorTable()
 
   var stmt = db.prepareInsertStatement()
   defer: stmt.finalize()
@@ -35,8 +36,7 @@ proc testSqliteVectorRoundTrip() =
       section: "Intro",
       metadataJson: "{\"page\":7,\"section\":\"Intro\"}"
     ),
-    embedding: @[1.0'f32, 0.0'f32, 0.0'f32],
-    dimension: 3
+    embedding: unitVector(0)
   ))
   db.insertChunk(stmt, ChunkRecord(
     chunk: InputChunk(
@@ -48,13 +48,12 @@ proc testSqliteVectorRoundTrip() =
       section: "",
       metadataJson: ""
     ),
-    embedding: @[0.0'f32, 1.0'f32, 0.0'f32],
-    dimension: 3
+    embedding: unitVector(1)
   ))
   db.commitTransaction()
-  db.rebuildQuantization(meta)
+  db.rebuildQuantization()
 
-  let rows = db.searchChunks([1.0'f32, 0.0'f32, 0.0'f32], 1)
+  let rows = db.searchChunks(unitVector(0), 1)
   doAssert rows.len == 1
   doAssert rows[0].text == "alpha"
   doAssert rows[0].hasPage

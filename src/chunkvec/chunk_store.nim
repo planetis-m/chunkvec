@@ -92,11 +92,6 @@ CREATE TABLE IF NOT EXISTS {TableName} (
   db.exec(sql(fmt"""
 CREATE INDEX IF NOT EXISTS idx_chunks_source_ordinal
   ON {TableName}(source, ordinal);"""))
-  db.exec(sql(fmt"""
-CREATE TABLE IF NOT EXISTS {MetaTableName} (
-  key TEXT PRIMARY KEY,
-  value TEXT NOT NULL
-);"""))
 
 proc beginTransaction*(db: DbConn) =
   db.exec(sql"BEGIN IMMEDIATE TRANSACTION;")
@@ -107,84 +102,14 @@ proc commitTransaction*(db: DbConn) =
 proc rollbackTransaction*(db: DbConn) =
   db.exec(sql"ROLLBACK;")
 
-proc invalidMetadataValue(key: string; value: string) {.noinline, noreturn.} =
-  raise newException(IOError,
-    "invalid sqlite metadata value for " & key & ": " & value)
-
-proc readMetadata*(db: DbConn): DbMetadata =
-  for row in db.fastRows(sql(fmt"SELECT key, value FROM {MetaTableName};")):
-    let key = row[0]
-    let value = row[1]
-    case key
-    of "model":
-      result.model = value
-    of "dimension":
-      try:
-        result.dimension = parseInt(value)
-      except ValueError:
-        invalidMetadataValue(key, value)
-    of "distance":
-      result.distance = value
-    of "qtype":
-      result.qtype = value
-    else:
-      discard
-
-  result.initialized =
-    result.model.len > 0 and
-    result.dimension > 0 and
-    result.distance.len > 0 and
-    result.qtype.len > 0
-
-proc writeMetadata*(db: DbConn; meta: DbMetadata) =
-  var stmt: SqlPrepared
-  try:
-    stmt = db.prepare(
-      fmt"INSERT OR REPLACE INTO {MetaTableName}(key, value) VALUES (?, ?);"
-    )
-
-    for pair in [
-      ("model", meta.model),
-      ("dimension", $meta.dimension),
-      ("distance", meta.distance),
-      ("qtype", meta.qtype)
-    ]:
-      db.exec(stmt, pair[0], pair[1])
-  finally:
-    if not stmt.isNil:
-      stmt.finalize()
-
-proc initializeVectorTable*(db: DbConn; meta: DbMetadata) =
-  if not meta.initialized:
-    return
-
-  let options = fmt"type=FLOAT32,dimension={meta.dimension},distance={meta.distance}"
+proc initializeVectorTable*(db: DbConn) =
+  let options = fmt"type={VectorType},dimension={EmbeddingDimension},distance={DistanceMetric}"
   discard db.getValue(
     sql"SELECT vector_init(?, ?, ?);",
     TableName,
     EmbeddingColumn,
     options
   )
-
-proc configuredMetadata*(model: string; dimension: int): DbMetadata =
-  DbMetadata(
-    initialized: true,
-    model: model,
-    dimension: dimension,
-    distance: DistanceMetric,
-    qtype: QuantizationType
-  )
-
-proc ensureMetadataCompatible*(meta: DbMetadata; model: string; dimension: int) =
-  if not meta.initialized:
-    return
-  if meta.model != model:
-    raise newException(ValueError,
-      "database model mismatch: expected " & meta.model & ", got " & model)
-  if meta.dimension != dimension:
-    raise newException(ValueError,
-      "database embedding dimension mismatch: expected " & $meta.dimension &
-      ", got " & $dimension)
 
 proc prepareInsertStatement*(db: DbConn): SqlPrepared =
   result = db.prepare(fmt"""
@@ -225,11 +150,8 @@ proc insertChunk*(db: DbConn; stmt: SqlPrepared; record: ChunkRecord) =
   if sqlite3.step(sqlite3.PStmt(stmt)) != SQLITE_DONE:
     raise db.sqliteError("failed to insert chunk row")
 
-proc rebuildQuantization*(db: DbConn; meta: DbMetadata) =
-  if not meta.initialized:
-    return
-
-  let options = "qtype=" & meta.qtype
+proc rebuildQuantization*(db: DbConn) =
+  let options = "qtype=" & QuantizationType
   discard db.getValue(
     sql"SELECT vector_quantize(?, ?, ?);",
     TableName,

@@ -2,7 +2,7 @@ import std/[monotimes, os, random, times]
 import relay
 import openai/[core, embeddings, retry]
 import ./[embeddings_client, request_id_codec, retry_and_errors, retry_queue,
-  chunk_store, types]
+  chunk_store, constants, types]
 
 const
   RetryPollSliceMs = 25
@@ -57,21 +57,13 @@ proc initPipelineState(total: int): PipelineState =
     rng: initRand(getMonoTime().ticks)
   )
 
-proc flushOrderedResults(db: DbConn; insertStmt: SqlPrepared; cfg: RuntimeConfig;
-    state: var PipelineState; dbMeta: var DbMetadata) =
+proc flushOrderedResults(db: DbConn; insertStmt: SqlPrepared; state: var PipelineState) =
   while state.nextFinalizeSeqId < state.staged.len and
       state.staged[state.nextFinalizeSeqId].status != ChunkPending:
     if state.staged[state.nextFinalizeSeqId].status != ChunkOk:
       state.allSucceeded = false
     else:
-      let record = state.records[state.nextFinalizeSeqId]
-      if not dbMeta.initialized:
-        dbMeta = configuredMetadata(cfg.networkConfig.model, record.dimension)
-        db.writeMetadata(dbMeta)
-        db.initializeVectorTable(dbMeta)
-      else:
-        dbMeta.ensureMetadataCompatible(cfg.networkConfig.model, record.dimension)
-      db.insertChunk(insertStmt, record)
+      db.insertChunk(insertStmt, state.records[state.nextFinalizeSeqId])
       state.wroteRows = true
 
     state.staged[state.nextFinalizeSeqId] = default(ChunkResult)
@@ -151,12 +143,19 @@ proc processEmbeddingSuccess(chunks: seq[InputChunk]; seqId, attempt: int; body:
         message = "embedding vector was empty"
       )
     else:
-      state.records[seqId] = ChunkRecord(
-        chunk: chunks[seqId],
-        embedding: @values,
-        dimension: values.len
-      )
-      state.staged[seqId] = okChunkResult(attempt)
+      if values.len != EmbeddingDimension:
+        state.staged[seqId] = errorChunkResult(
+          attempts = attempt,
+          kind = PayloadError,
+          message = "embedding dimension mismatch: expected " & $EmbeddingDimension &
+            ", got " & $values.len
+        )
+      else:
+        state.records[seqId] = ChunkRecord(
+          chunk: chunks[seqId],
+          embedding: @values
+        )
+        state.staged[seqId] = okChunkResult(attempt)
 
 proc processResult(cfg: RuntimeConfig; chunks: seq[InputChunk]; item: RequestResult;
     maxAttempts: int; retryPolicy: RetryPolicy; state: var PipelineState) =
@@ -219,7 +218,7 @@ proc waitForProgress(cfg: RuntimeConfig; chunks: seq[InputChunk]; client: Relay;
       sleep(min(RetryPollSliceMs, nextRetryMs))
 
 proc runPipeline*(cfg: RuntimeConfig; chunks: seq[InputChunk]; client: Relay;
-    db: DbConn; insertStmt: SqlPrepared; dbMeta: var DbMetadata): tuple[
+    db: DbConn; insertStmt: SqlPrepared): tuple[
       allSucceeded: bool, wroteRows: bool] =
   let total = chunks.len
   let maxInFlight = max(1, cfg.networkConfig.maxInflight)
@@ -233,13 +232,13 @@ proc runPipeline*(cfg: RuntimeConfig; chunks: seq[InputChunk]; client: Relay;
     submitDueRetries(cfg, chunks, maxInFlight, state)
     submitFreshAttempts(cfg, chunks, maxInFlight, state)
     startBatchIfAny(client, state)
-    flushOrderedResults(db, insertStmt, cfg, state, dbMeta)
+    flushOrderedResults(db, insertStmt, state)
 
     let drained = drainReadyResults(cfg, chunks, client, maxAttempts, retryPolicy, state)
-    flushOrderedResults(db, insertStmt, cfg, state, dbMeta)
+    flushOrderedResults(db, insertStmt, state)
 
     if state.remaining > 0 and not drained:
       waitForProgress(cfg, chunks, client, maxInFlight, maxAttempts, retryPolicy, state)
-      flushOrderedResults(db, insertStmt, cfg, state, dbMeta)
+      flushOrderedResults(db, insertStmt, state)
 
   result = (allSucceeded: state.allSucceeded, wroteRows: state.wroteRows)

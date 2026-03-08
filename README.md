@@ -13,7 +13,6 @@ and later answers similarity queries locally from that database.
 - chunk boundaries stay under your control; `chunkvec` never re-chunks text
 - ingest preserves the original order with explicit `ordinal` values
 - optional per-chunk metadata headers (`page`, `section`) stay attached to rows
-- the database stores model and dimension metadata and rejects mismatched search
 - search does one remote embedding call, then runs nearest-neighbor lookup
   locally through `sqlite-vector`
 
@@ -30,8 +29,7 @@ and later answers similarity queries locally from that database.
 
 2. `chunkvec_search`:
 - reads query text from `stdin`
-- embeds that query through the same model
-- validates model and vector dimension against the database metadata
+- embeds that query through the same built-in model
 - prints top matches from the local SQLite database
 
 The public contract is intentionally small: one marked-up text file in, one
@@ -104,7 +102,6 @@ Supported keys:
 
 - `api_key`
 - `api_url`
-- `model`
 - `max_inflight`
 - `max_retries`
 - `total_timeout_ms`
@@ -115,7 +112,6 @@ Example:
 ```json
 {
   "api_url": "https://api.deepinfra.com/v1/openai/embeddings",
-  "model": "Qwen/Qwen3-Embedding-0.6B",
   "max_inflight": 32,
   "max_retries": 5,
   "total_timeout_ms": 120000,

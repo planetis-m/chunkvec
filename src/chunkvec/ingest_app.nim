@@ -1,7 +1,6 @@
 import std/os
 import relay
-import ./[constants, chunk_store, input_chunks, logging, pipeline, runtime_config,
-  types]
+import ./[constants, chunk_store, input_chunks, logging, pipeline, runtime_config, types]
 
 proc shutdownRelay(client: Relay; shouldAbort: bool) =
   if shouldAbort:
@@ -39,14 +38,10 @@ proc runIngestApp*(): int =
     dbOpened = true
     db.loadExtension(cfg.sqliteConfig.extensionPath)
     db.initSchema()
-
-    var dbMeta = db.readMetadata()
-    if dbMeta.initialized:
-      dbMeta.ensureMetadataCompatible(cfg.networkConfig.model, dbMeta.dimension)
-      db.initializeVectorTable(dbMeta)
+    db.initializeVectorTable()
 
     var insertStmt = db.prepareInsertStatement()
-    var pipelineResult: tuple[allSucceeded: bool, wroteRows: bool]
+    var pipelineResult: tuple[allSucceeded, wroteRows: bool]
     try:
       db.beginTransaction()
       transactionOpen = true
@@ -56,16 +51,15 @@ proc runIngestApp*(): int =
         defaultTimeoutMs = cfg.networkConfig.totalTimeoutMs
       )
 
-      pipelineResult = runPipeline(cfg, chunks, client, db, insertStmt, dbMeta)
+      pipelineResult = runPipeline(cfg, chunks, client, db, insertStmt)
 
       db.commitTransaction()
       transactionOpen = false
     finally:
       insertStmt.finalize()
 
-    if pipelineResult.wroteRows and dbMeta.initialized:
-      db.initializeVectorTable(dbMeta)
-      db.rebuildQuantization(dbMeta)
+    if pipelineResult.wroteRows:
+      db.rebuildQuantization()
 
     result = if pipelineResult.allSucceeded: ExitAllOk else: ExitPartialFailure
   except CatchableError:

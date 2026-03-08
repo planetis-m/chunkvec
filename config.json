@@ -1,7 +1,6 @@
 {
   "api_key": "replace-with-key",
   "api_url": "https://api.deepinfra.com/v1/openai/embeddings",
-  "model": "Qwen/Qwen3-Embedding-0.6B",
   "max_inflight": 32,
   "max_retries": 5,
   "total_timeout_ms": 120000,
