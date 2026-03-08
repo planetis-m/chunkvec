@@ -1,12 +1,12 @@
 import std/os
 
-proc sqliteVectorExtensionFilename*(): string =
+const ExtensionFilename* =
   when defined(windows):
-    result = "vector.dll"
+    "vector.dll"
   elif defined(macosx):
-    result = "vector.dylib"
+    "vector.dylib"
   else:
-    result = "vector.so"
+    "vector.so"
 
-proc appLocalSqliteVectorExtensionPath*(): string =
-  result = getAppDir() / sqliteVectorExtensionFilename()
+proc extensionPath*(): string =
+  result = getAppDir() / ExtensionFilename

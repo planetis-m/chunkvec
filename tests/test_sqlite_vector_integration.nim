@@ -4,7 +4,7 @@ import ../src/chunkvec/[chunk_store, sqlite_vector_paths, types]
 proc testSqliteVectorRoundTrip() =
   let repoRoot = getCurrentDir()
   let dbPath = repoRoot / "test_files" / "vector_test.sqlite"
-  let extensionPath = repoRoot / sqliteVectorExtensionFilename()
+  let extPath = repoRoot / ExtensionFilename
   if fileExists(dbPath):
     removeFile(dbPath)
 
@@ -14,7 +14,7 @@ proc testSqliteVectorRoundTrip() =
     if fileExists(dbPath):
       removeFile(dbPath)
 
-  db.loadExtension(extensionPath)
+  db.loadExtension(extPath)
   db.initSchema()
 
   let meta = configuredMetadata("Qwen/Qwen3-Embedding-0.6B", 3)

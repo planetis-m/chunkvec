@@ -99,7 +99,7 @@ proc buildRuntimeConfig(): RuntimeConfig =
       topK: ifPositive(rawConfig.top_k, TopK)
     ),
     sqliteConfig: SqliteConfig(
-      extensionPath: appLocalSqliteVectorExtensionPath()
+      extensionPath: extensionPath()
     )
   )
 
@@ -135,13 +135,18 @@ proc parseIngestCliArgs(cliArgs: seq[string]): tuple[inputPath, dbPath: string] 
     cliError("missing required DB.sqlite argument", IngestHelpText)
 
 proc parseSearchCliArgs(cliArgs: seq[string]): tuple[dbPath, queryPath: string] =
+  result = (dbPath: "", queryPath: "")
   var parser = initOptParser(cliArgs)
-  var positional: seq[string]
 
   for kind, key, val in parser.getopt():
     case kind
     of cmdArgument:
-      positional.add(parser.key)
+      if result.dbPath.len == 0:
+        result.dbPath = parser.key
+      elif result.queryPath.len == 0:
+        result.queryPath = parser.key
+      else:
+        cliError("too many positional arguments", SearchHelpText)
     of cmdLongOption:
       if key == "help":
         quit(SearchHelpText, ExitAllOk)
@@ -155,13 +160,10 @@ proc parseSearchCliArgs(cliArgs: seq[string]): tuple[dbPath, queryPath: string] 
     of cmdEnd:
       discard
 
-  if positional.len < 2:
-    cliError("missing required DB and QUERY arguments", SearchHelpText)
-  if positional.len > 2:
-    cliError("too many positional arguments", SearchHelpText)
-
-  result.dbPath = positional[0]
-  result.queryPath = positional[1]
+  if result.dbPath.len == 0:
+    cliError("missing required DB.sqlite argument", SearchHelpText)
+  if result.queryPath.len == 0:
+    cliError("missing required QUERY.txt argument", SearchHelpText)
 
 proc buildIngestRuntimeConfig*(cliArgs: seq[string]): IngestCliConfig =
   let parsed = parseIngestCliArgs(cliArgs)
