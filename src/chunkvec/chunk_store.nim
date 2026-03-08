@@ -84,10 +84,10 @@ proc commitTransaction*(db: DbConn) =
 proc rollbackTransaction*(db: DbConn) =
   db.exec(sql"ROLLBACK;")
 
-proc initializeVectorTable*(db: DbConn) =
+proc initializeVectorTable*(db: DbConn; embeddingDimension: int) =
   let options =
     "type=" & VectorType &
-    ",dimension=" & $EmbeddingDimension &
+    ",dimension=" & $embeddingDimension &
     ",distance=" & DistanceMetric
   discard db.getValue(sql"SELECT vector_init(?, ?, ?);", TableName, EmbeddingColumn, options)
 

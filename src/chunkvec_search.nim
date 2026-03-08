@@ -50,7 +50,7 @@ proc runSearchApp*(): int =
     dbOpened = true
     db.loadExtension(cfg.sqliteConfig.extensionPath)
     db.initSchema()
-    db.initializeVectorTable()
+    db.initializeVectorTable(cfg.embeddingDimension)
 
     let rows = db.searchChunks(queryVector, cfg.topK, searchInput.filters)
     for i in 0 ..< rows.len:

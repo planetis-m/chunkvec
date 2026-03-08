@@ -15,6 +15,8 @@ type
   JsonRuntimeConfig = object
     api_key: string
     api_url: string
+    model: string
+    embedding_dimension: int
     max_inflight: int
     max_retries: int
     total_timeout_ms: int
@@ -36,6 +38,8 @@ proc defaultJsonRuntimeConfig(): JsonRuntimeConfig =
   JsonRuntimeConfig(
     api_key: "",
     api_url: ApiUrl,
+    model: Model,
+    embedding_dimension: EmbeddingDimension,
     max_inflight: MaxInflight,
     max_retries: MaxRetries,
     total_timeout_ms: TotalTimeoutMs,
@@ -114,6 +118,8 @@ proc buildRuntimeConfig*(cliArgs: seq[string]): RuntimeConfig =
   result = RuntimeConfig(
     inputPath: parsed.inputPath,
     dbPath: parsed.dbPath,
+    model: ifNonEmpty(rawConfig.model, Model),
+    embeddingDimension: ifPositive(rawConfig.embedding_dimension, EmbeddingDimension),
     topK: ifPositive(rawConfig.top_k, TopK),
     openaiConfig: OpenAIConfig(
       url: resolvedApiUrl,

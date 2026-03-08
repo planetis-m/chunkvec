@@ -127,8 +127,8 @@ proc submitFreshAttempts(cfg: RuntimeConfig; chunks: seq[InputChunk]; maxInFligh
         dec state.activeCount
       inc state.nextSubmitSeqId
 
-proc processEmbeddingSuccess(chunks: seq[InputChunk]; seqId, attempt: int; body: string;
-    state: var PipelineState) =
+proc processEmbeddingSuccess(chunks: seq[InputChunk]; embeddingDimension, seqId, attempt: int;
+    body: string; state: var PipelineState) =
   var parsed: EmbeddingCreateResult
   if not embeddingParse(body, parsed):
     state.staged[seqId] = errorChunkResult(
@@ -144,11 +144,11 @@ proc processEmbeddingSuccess(chunks: seq[InputChunk]; seqId, attempt: int; body:
     )
   else:
     let embeddingLen = embedding(parsed).len
-    if embeddingLen != EmbeddingDimension:
+    if embeddingLen != embeddingDimension:
       state.staged[seqId] = errorChunkResult(
         attempts = attempt,
         kind = PayloadError,
-        message = "embedding dimension mismatch: expected " & $EmbeddingDimension &
+        message = "embedding dimension mismatch: expected " & $embeddingDimension &
           ", got " & $embeddingLen
       )
     else:
@@ -183,7 +183,7 @@ proc processResult(cfg: RuntimeConfig; chunks: seq[InputChunk]; item: RequestRes
         httpStatus = finalError.httpStatus
       )
     else:
-      processEmbeddingSuccess(chunks, seqId, attempt, item.response.body, state)
+      processEmbeddingSuccess(chunks, cfg.embeddingDimension, seqId, attempt, item.response.body, state)
     dec state.activeCount
 
 proc drainReadyResults(cfg: RuntimeConfig; chunks: seq[InputChunk]; client: Relay;

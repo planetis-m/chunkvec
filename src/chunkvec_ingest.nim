@@ -35,7 +35,7 @@ proc runIngestApp*(): int =
     dbOpened = true
     db.loadExtension(cfg.sqliteConfig.extensionPath)
     db.initSchema()
-    db.initializeVectorTable()
+    db.initializeVectorTable(cfg.embeddingDimension)
 
     var insertStmt = db.prepareInsertStatement()
     var pipelineResult: tuple[allSucceeded, wroteRows: bool]

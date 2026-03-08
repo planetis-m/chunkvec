@@ -5,7 +5,7 @@ import ./[constants, retry_and_errors, types]
 
 proc buildEmbeddingParams*(cfg: RuntimeConfig; text: sink string): EmbeddingCreateParams =
   embeddingCreate(
-    model = Model,
+    model = cfg.model,
     input = text,
     encodingFormat = EncodingFormat
   )
@@ -37,8 +37,9 @@ proc requestEmbeddingWithRetry*(client: Relay; cfg: RuntimeConfig;
       if not embeddingParse(item.response.body, parsed):
         raise newException(ValueError, "failed to parse embeddings response")
       let embeddingLen = embedding(parsed).len
-      if embeddingLen != EmbeddingDimension:
-        raise newException(ValueError, "embedding dimension mismatch: expected " & $EmbeddingDimension &
+      if embeddingLen != cfg.embeddingDimension:
+        raise newException(ValueError, "embedding dimension mismatch: expected " &
+          $cfg.embeddingDimension &
           ", got " & $embeddingLen)
       result = move embedding(parsed)
       break

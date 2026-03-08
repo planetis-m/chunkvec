@@ -27,6 +27,8 @@ type
   RuntimeConfig* = object
     inputPath*: string
     dbPath*: string
+    model*: string
+    embeddingDimension*: int
     topK*: int
     openaiConfig*: OpenAIConfig
     networkConfig*: NetworkConfig

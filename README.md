@@ -103,6 +103,8 @@ Supported keys:
 
 - `api_key`
 - `api_url`
+- `model`
+- `embedding_dimension`
 - `max_inflight`
 - `max_retries`
 - `total_timeout_ms`
@@ -113,6 +115,8 @@ Example:
 ```json
 {
   "api_url": "https://api.deepinfra.com/v1/openai/embeddings",
+  "model": "Qwen/Qwen3-Embedding-0.6B",
+  "embedding_dimension": 1024,
   "max_inflight": 32,
   "max_retries": 5,
   "total_timeout_ms": 120000,
@@ -124,6 +128,7 @@ Built-in defaults:
 
 - endpoint: `https://api.deepinfra.com/v1/openai/embeddings`
 - model: `Qwen/Qwen3-Embedding-0.6B`
+- embedding dimension: `1024`
 - max inflight: `32`
 - max retries: `5`
 - total timeout: `120000 ms`
