@@ -36,5 +36,4 @@ proc requestEmbeddingWithRetry*(client: Relay; cfg: RuntimeConfig;
       var parsed: EmbeddingCreateResult
       if not embeddingParse(item.response.body, parsed):
         raise newException(ValueError, "failed to parse embeddings response")
-      result = embedding(parsed)
-      break
+      return embedding(parsed)
