@@ -31,7 +31,7 @@ proc testSqliteVectorRoundTrip() =
     "notes.txt",
     1,
     "alpha",
-    packFloat32Blob(unitVector(0)),
+    unitVector(0),
     "{\"page\":7,\"section\":\"Intro\"}"
   )
   db.exec(
@@ -39,7 +39,7 @@ proc testSqliteVectorRoundTrip() =
     "notes.txt",
     2,
     "beta",
-    packFloat32Blob(unitVector(1)),
+    unitVector(1),
     ""
   )
   db.commitTransaction()

@@ -63,19 +63,18 @@ proc flushOrderedResults(db: DbConn; insertStmt: SqlPrepared; state: var Pipelin
     if state.staged[state.nextFinalizeSeqId].status != ChunkOk:
       state.allSucceeded = false
     else:
-      let record = state.records[state.nextFinalizeSeqId]
+      let record = move state.records[state.nextFinalizeSeqId]
       db.exec(
         insertStmt,
         record.chunk.source,
         record.chunk.ordinal,
         record.chunk.text,
-        packFloat32Blob(record.embedding),
+        record.embedding,
         record.chunk.metadataJson
       )
       state.wroteRows = true
 
     state.staged[state.nextFinalizeSeqId] = default(ChunkResult)
-    state.records[state.nextFinalizeSeqId] = default(ChunkRecord)
     inc state.nextFinalizeSeqId
     dec state.remaining
 
@@ -143,27 +142,11 @@ proc processEmbeddingSuccess(chunks: seq[InputChunk]; seqId, attempt: int; body:
       message = "embeddings response had no vectors"
     )
   else:
-    let values = embedding(parsed)
-    if values.len == 0:
-      state.staged[seqId] = errorChunkResult(
-        attempts = attempt,
-        kind = PayloadError,
-        message = "embedding vector was empty"
-      )
-    else:
-      if values.len != EmbeddingDimension:
-        state.staged[seqId] = errorChunkResult(
-          attempts = attempt,
-          kind = PayloadError,
-          message = "embedding dimension mismatch: expected " & $EmbeddingDimension &
-            ", got " & $values.len
-        )
-      else:
-        state.records[seqId] = ChunkRecord(
-          chunk: chunks[seqId],
-          embedding: @values
-        )
-        state.staged[seqId] = okChunkResult(attempt)
+    state.records[seqId] = ChunkRecord(
+      chunk: chunks[seqId],
+      embedding: embedding(parsed)
+    )
+    state.staged[seqId] = okChunkResult(attempt)
 
 proc processResult(cfg: RuntimeConfig; chunks: seq[InputChunk]; item: RequestResult;
     maxAttempts: int; retryPolicy: RetryPolicy; state: var PipelineState) =

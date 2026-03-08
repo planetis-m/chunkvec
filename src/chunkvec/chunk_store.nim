@@ -4,11 +4,6 @@ import ./[constants, types]
 
 export db_sqlite
 
-proc packFloat32Blob*(values: seq[float32]): seq[byte] =
-  result = newSeq[byte](values.len * sizeof(float32))
-  if result.len > 0:
-    copyMem(addr result[0], addr values[0], result.len)
-
 when defined(windows):
   when defined(nimOldDlls):
     const SqliteDynlib = "sqlite3.dll"
@@ -30,6 +25,12 @@ proc sqlite3LoadExtension(db: DbConn; file: cstring; procName: cstring;
 proc checkSqliteRc(db: DbConn; rc: int32) =
   if rc != SQLITE_OK:
     dbError(db)
+
+proc bindParam*(ps: SqlPrepared; paramIdx: int; val: seq[float32]; copy = true) =
+  let len = val.len * sizeof(float32)
+  if bind_blob(ps.PStmt, paramIdx.int32, if val.len > 0: cast[pointer](addr val[0]) else: nil, len.int32,
+      if copy: SQLITE_TRANSIENT else: SQLITE_STATIC) != SQLITE_OK:
+    dbBindParamError(paramIdx, val)
 
 proc textColumn(row: InstantRow; index: int32): string =
   let value = unsafeColumnAt(row, index)
@@ -129,7 +130,7 @@ ORDER BY v.distance ASC, c.id ASC;
   var stmt: SqlPrepared
   try:
     stmt = db.prepare(query)
-    stmt.bindParam(1, packFloat32Blob(queryVector))
+    stmt.bindParam(1, queryVector)
     stmt.bindParam(2, topK)
 
     for row in db.instantRows(stmt):
