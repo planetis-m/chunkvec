@@ -1,4 +1,4 @@
-import std/[os, strutils]
+import std/[os, strutils, syncio]
 import relay
 import openai/[core, embeddings]
 import ./[chunk_store, constants, embeddings_client, logging, runtime_config,
@@ -42,15 +42,13 @@ proc runSearchApp*(): int =
         "missing API key; set DEEPINFRA_API_KEY or api_key in config.json")
     if not fileExists(cli.dbPath):
       raise newException(ValueError, "database does not exist: " & cli.dbPath)
-    if not fileExists(cli.queryPath):
-      raise newException(ValueError, "query file does not exist: " & cli.queryPath)
     if not fileExists(cfg.sqliteConfig.extensionPath):
       raise newException(ValueError,
         "sqlite-vector extension does not exist: " & cfg.sqliteConfig.extensionPath)
 
-    let queryText = readFile(cli.queryPath).strip()
+    let queryText = stdin.readAll().strip()
     if queryText.len == 0:
-      raise newException(ValueError, "query file did not contain any text")
+      raise newException(ValueError, "query text must be provided on stdin")
 
     client = newRelay(
       maxInFlight = 1,

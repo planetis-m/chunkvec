@@ -29,13 +29,13 @@ and later answers similarity queries locally from that database.
 - initializes and quantizes the `sqlite-vector` column
 
 2. `chunkvec_search`:
-- reads one query text file
+- reads query text from `stdin`
 - embeds that query through the same model
 - validates model and vector dimension against the database metadata
 - prints top matches from the local SQLite database
 
 The public contract is intentionally small: one marked-up text file in, one
-SQLite database out, then local search from one query file.
+SQLite database out, then local search from one query on `stdin`.
 
 ## Installation
 
@@ -138,12 +138,13 @@ Built-in defaults:
 
 ```bash
 ./chunkvec_ingest INPUT.txt DB.sqlite
-./chunkvec_search DB.sqlite QUERY.txt
+./chunkvec_search DB.sqlite < QUERY.txt
 ./chunkvec_ingest --help
 ./chunkvec_search --help
 ```
 
-- `INPUT.txt`, `DB.sqlite`, and `QUERY.txt` are required positional paths
+- `INPUT.txt` and `DB.sqlite` are required positional paths
+- `chunkvec_search` reads the query text from `stdin`
 - `stdout` is used only for search results
 - logs and fatal errors go to `stderr`
 
@@ -192,7 +193,7 @@ Nearest-neighbor search compares a query vector against stored vectors.<bk>
 Use cosine distance when direction matters more than magnitude.
 ```
 
-Prepare a query file:
+Prepare a query:
 
 ```text
 How do embeddings help search?
@@ -213,7 +214,7 @@ Ingest:
 Search:
 
 ```bash
-./chunkvec_search notes.sqlite query.txt
+printf '%s\n' 'How do embeddings help search?' | ./chunkvec_search notes.sqlite
 ```
 
 Typical output:
@@ -237,7 +238,7 @@ Nearest-neighbor search compares a query vector against stored vectors.
 
 - DeepInfra API key via `DEEPINFRA_API_KEY` or `config.json`
 - one marked-up input text file for ingest
-- one query text file for search
+- query text on `stdin` for search
 - `vector.so`, `vector.dylib`, or `vector.dll` beside the executables
 - if building from source: Nim `>= 2.2.8`, Atlas, `libcurl`, and SQLite
 

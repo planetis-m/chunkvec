@@ -28,7 +28,7 @@ Options:
 
   SearchHelpText = """
 Usage:
-  chunkvec_search DB.sqlite QUERY.txt
+  chunkvec_search DB.sqlite < QUERY.txt
 
 Options:
   --help, -h       Show this help and exit.
@@ -134,17 +134,15 @@ proc parseIngestCliArgs(cliArgs: seq[string]): tuple[inputPath, dbPath: string] 
   if result.dbPath.len == 0:
     cliError("missing required DB.sqlite argument", IngestHelpText)
 
-proc parseSearchCliArgs(cliArgs: seq[string]): tuple[dbPath, queryPath: string] =
-  result = (dbPath: "", queryPath: "")
+proc parseSearchCliArgs(cliArgs: seq[string]): string =
+  result = ""
   var parser = initOptParser(cliArgs)
 
   for kind, key, val in parser.getopt():
     case kind
     of cmdArgument:
-      if result.dbPath.len == 0:
-        result.dbPath = parser.key
-      elif result.queryPath.len == 0:
-        result.queryPath = parser.key
+      if result.len == 0:
+        result = parser.key
       else:
         cliError("too many positional arguments", SearchHelpText)
     of cmdLongOption:
@@ -160,10 +158,8 @@ proc parseSearchCliArgs(cliArgs: seq[string]): tuple[dbPath, queryPath: string] 
     of cmdEnd:
       discard
 
-  if result.dbPath.len == 0:
+  if result.len == 0:
     cliError("missing required DB.sqlite argument", SearchHelpText)
-  if result.queryPath.len == 0:
-    cliError("missing required QUERY.txt argument", SearchHelpText)
 
 proc buildIngestRuntimeConfig*(cliArgs: seq[string]): IngestCliConfig =
   let parsed = parseIngestCliArgs(cliArgs)
@@ -175,9 +171,7 @@ proc buildIngestRuntimeConfig*(cliArgs: seq[string]): IngestCliConfig =
 
 proc buildSearchRuntimeConfig*(cliArgs: seq[string]): SearchCliConfig =
   let parsed = parseSearchCliArgs(cliArgs)
-
   result = SearchCliConfig(
-    dbPath: parsed.dbPath,
-    queryPath: parsed.queryPath,
+    dbPath: parsed,
     runtime: buildRuntimeConfig()
   )
