@@ -1,45 +1,35 @@
 import std/[parseutils, strutils]
-import ./[marker_parser, types]
+import ./[marker_parser, parse_errors, types]
 
 const
   SearchMarkerName = "search"
 
-proc failParse(source: string; message: string) {.noreturn.} =
-  raise newException(ValueError,
-    source & ": invalid search input: " & message)
-
-proc parseSearchMarker(source: string; text: string; startPos: int): tuple[
-    filters: SearchFilters, nextPos: int] =
-  var filters = initSearchFilters()
-  var nextPos = 0
+proc parseSearchMarker(source: string; text: string; filters: var SearchFilters;
+    startPos: int): int =
+  var page = NoPageFilter
+  var section = ""
 
   proc parseSearchAttr(attrName: string; text: string; pos: var int) =
     case attrName
     of "page":
-      var pageNumber = 0
-      let parsed = parseInt(text, pageNumber, pos)
+      let parsed = parseInt(text, page, pos)
       if parsed == 0:
-        failParse(source, "page must be an integer")
-      filters.pageNumber = pageNumber
+        failParse(source, "search input", "page must be an integer")
       pos.inc(parsed)
     of "section":
-      try:
-        filters.sectionSubstring = parseQuotedValue(text, pos)
-      except ValueError:
-        failParse(source, "section must use a double-quoted string")
+      let parsed = parseQuotedValue(text, section, pos)
+      if parsed == 0:
+        failParse(source, "search input", "section must use a double-quoted string")
+      pos.inc(parsed)
     else:
-      failParse(source, "unknown attribute " & attrName)
+      failParse(source, "search input", "unknown attribute " & attrName)
 
-  try:
-    nextPos = parseMarker(text, startPos, SearchMarkerName, parseSearchAttr)
-  except ValueError:
-    failParse(source, "expected <search ...> marker")
+  let parsedLen = parseMarker(text, startPos, SearchMarkerName, parseSearchAttr)
+  if parsedLen == 0:
+    return 0
 
-  result = (filters: filters, nextPos: nextPos)
-
-proc skipLineSpaces(text: string; pos: var int) =
-  while pos < text.len and text[pos] in {' ', '\t'}:
-    inc pos
+  filters = SearchFilters(pageNumber: page, sectionSubstring: section)
+  result = parsedLen
 
 proc consumeNewline(text: string; pos: var int): bool =
   if pos < text.len and text[pos] == '\r':
@@ -52,26 +42,29 @@ proc consumeNewline(text: string; pos: var int): bool =
     result = true
 
 proc requireBlankLineSeparator(source: string; text: string; pos: var int) =
-  skipLineSpaces(text, pos)
+  pos.inc(skipWhile(text, {' ', '\t'}, pos))
   if not consumeNewline(text, pos):
-    failParse(source, "marker must be followed by a blank line")
+    failParse(source, "search input", "marker must be followed by a blank line")
 
   let blankLineStart = pos
-  skipLineSpaces(text, pos)
+  pos.inc(skipWhile(text, {' ', '\t'}, pos))
   if pos == blankLineStart:
     discard
   if not consumeNewline(text, pos):
-    failParse(source, "marker must be followed by a blank line")
+    failParse(source, "search input", "marker must be followed by a blank line")
 
 proc parseSearchInput*(source, text: string): SearchInput =
   let startPos = skipWhitespace(text)
   if startPos < text.len and text[startPos] == '<':
-    let marker = parseSearchMarker(source, text, startPos)
-    var queryStart = marker.nextPos
+    var filters = initSearchFilters()
+    let markerLen = parseSearchMarker(source, text, filters, startPos)
+    if markerLen == 0:
+      failParse(source, "search input", "expected <search ...> marker")
+    var queryStart = startPos + markerLen
     requireBlankLineSeparator(source, text, queryStart)
     result = SearchInput(
       queryText: text[queryStart .. ^1].strip(),
-      filters: marker.filters
+      filters: filters
     )
   else:
     result = SearchInput(

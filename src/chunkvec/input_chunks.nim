@@ -1,13 +1,9 @@
 import std/[parseutils, strutils]
-import ./[marker_parser, types]
+import ./[marker_parser, parse_errors, types]
 
 const
-  MarkerName = "page"
-  MarkerPrefix = "<" & MarkerName
-
-proc failParse(source: string; ordinal: int; message: string) {.noreturn.} =
-  raise newException(ValueError,
-    source & ": invalid chunk " & $ordinal & ": " & message)
+  PageMarkerName = "page"
+  PageMarkerPrefix = "<page"
 
 proc trimChunkBounds(text: string; startPos, endPos: int): Slice[int] =
   var first = startPos
@@ -20,82 +16,61 @@ proc trimChunkBounds(text: string; startPos, endPos: int): Slice[int] =
 
   result = first ..< last
 
-proc isMarkerStart(text: string; pos: int): bool =
-  if pos < 0 or pos + MarkerPrefix.len > text.len:
-    return false
-  if text[pos ..< pos + MarkerPrefix.len] != MarkerPrefix:
-    return false
-
-  var linePos = pos - 1
-  while linePos >= 0 and text[linePos] notin {'\n', '\r'}:
-    if text[linePos] notin {' ', '\t'}:
-      return false
-    dec linePos
-
-  result = true
-
-proc findNextMarkerStart(text: string; startPos: int): int =
-  result = text.len
-  var pos = startPos
-  while pos < text.len:
-    if text[pos] == '<' and text.isMarkerStart(pos):
-      result = pos
-      break
-    inc pos
-
-proc parsePageMarker(source: string; ordinal: int; text: string; startPos: int): tuple[
-    metadata: ChunkMetadata, nextPos: int] =
-  var metadata: ChunkMetadata
-  var nextPos = 0
-  var sawPageNumber = false
+proc parsePageMarker(source: string; text: string; metadata: var ChunkMetadata;
+    startPos: int): int =
+  var page = 0
+  var havePage = false
+  var section = ""
 
   proc parsePageAttr(attrName: string; text: string; pos: var int) =
     case attrName
     of "n":
-      var pageNumber = 0
-      let parsed = parseInt(text, pageNumber, pos)
+      let parsed = parseInt(text, page, pos)
       if parsed == 0:
-        failParse(source, ordinal, "n must be an integer")
-      metadata.pageNumber = pageNumber
-      sawPageNumber = true
+        failParse(source, "input", "n must be an integer")
+      havePage = true
       pos.inc(parsed)
     of "section":
-      try:
-        metadata.section = parseQuotedValue(text, pos)
-      except ValueError:
-        failParse(source, ordinal, "section must use a double-quoted string")
+      let parsed = parseQuotedValue(text, section, pos)
+      if parsed == 0:
+        failParse(source, "input", "section must use a double-quoted string")
+      pos.inc(parsed)
     else:
-      failParse(source, ordinal, "unknown attribute " & attrName)
+      failParse(source, "input", "unknown attribute " & attrName)
 
-  try:
-    nextPos = parseMarker(text, startPos, MarkerName, parsePageAttr)
-  except ValueError:
-    failParse(source, ordinal, "expected <page ...> marker")
+  let parsedLen = parseMarker(text, startPos, PageMarkerName, parsePageAttr)
+  if parsedLen == 0:
+    return 0
+  if not havePage:
+    failParse(source, "input", "missing required n attribute")
 
-  if not sawPageNumber:
-    failParse(source, ordinal, "missing required n attribute")
-
-  result = (metadata: metadata, nextPos: nextPos)
+  metadata = ChunkMetadata(pageNumber: page, section: section)
+  result = parsedLen
 
 proc parseInputChunks*(source, text: string): seq[InputChunk] =
   var pos = skipWhitespace(text)
   var ordinal = 1
 
   while pos < text.len:
-    if not text.isMarkerStart(pos):
-      failParse(source, ordinal, "missing <page ...> marker")
+    if not markerAtLineStart(text, pos, PageMarkerPrefix):
+      failParse(source, "input", "missing <page ...> marker")
 
-    let marker = parsePageMarker(source, ordinal, text, pos)
-    let nextMarkerPos = findNextMarkerStart(text, marker.nextPos)
-    let bodyBounds = trimChunkBounds(text, marker.nextPos, nextMarkerPos)
+    var metadata: ChunkMetadata
+    let markerLen = parsePageMarker(source, text, metadata, pos)
+    if markerLen == 0:
+      failParse(source, "input", "expected <page ...> marker")
+
+    let bodyStart = pos + markerLen
+    let nextMarkerPos = findNextMarker(text, bodyStart, PageMarkerPrefix)
+    let bodyBounds = trimChunkBounds(text, bodyStart, nextMarkerPos)
     if bodyBounds.a >= bodyBounds.b:
-      failParse(source, ordinal, "chunk body is empty")
+      failParse(source, "input", "chunk body is empty")
 
     result.add(InputChunk(
       source: source,
       ordinal: ordinal,
       text: text[bodyBounds],
-      metadata: marker.metadata
+      metadata: metadata
     ))
 
     pos = nextMarkerPos
