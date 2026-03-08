@@ -77,14 +77,15 @@ template ifNonNegative(value, fallback: untyped): untyped =
   if value >= 0: value
   else: fallback
 
-proc buildRuntimeConfig(): RuntimeConfig =
+proc buildRuntimeConfig(inputPath, dbPath: string): RuntimeConfig =
   let configPath = Path(getAppDir()) / Path(DefaultConfigPath)
   let rawConfig = loadOptionalJsonRuntimeConfig(configPath)
   let resolvedApiKey = resolveApiKey(rawConfig.api_key)
   let resolvedApiUrl = ifNonEmpty(rawConfig.api_url, ApiUrl)
 
   result = RuntimeConfig(
-    breakMarker: BreakMarker,
+    inputPath: inputPath,
+    dbPath: dbPath,
     openaiConfig: OpenAIConfig(
       url: resolvedApiUrl,
       apiKey: resolvedApiKey
@@ -158,17 +159,10 @@ proc parseSearchCliArgs(cliArgs: seq[string]): string =
   if result.len == 0:
     cliError("missing required DB.sqlite argument", SearchHelpText)
 
-proc buildIngestRuntimeConfig*(cliArgs: seq[string]): IngestCliConfig =
+proc buildIngestRuntimeConfig*(cliArgs: seq[string]): RuntimeConfig =
   let parsed = parseIngestCliArgs(cliArgs)
-  result = IngestCliConfig(
-    inputPath: parsed.inputPath,
-    dbPath: parsed.dbPath,
-    runtime: buildRuntimeConfig()
-  )
+  result = buildRuntimeConfig(parsed.inputPath, parsed.dbPath)
 
-proc buildSearchRuntimeConfig*(cliArgs: seq[string]): SearchCliConfig =
+proc buildSearchRuntimeConfig*(cliArgs: seq[string]): RuntimeConfig =
   let parsed = parseSearchCliArgs(cliArgs)
-  result = SearchCliConfig(
-    dbPath: parsed,
-    runtime: buildRuntimeConfig()
-  )
+  result = buildRuntimeConfig("", parsed)

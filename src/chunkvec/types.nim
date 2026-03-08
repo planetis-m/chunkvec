@@ -11,19 +11,11 @@ type
     extensionPath*: string
 
   RuntimeConfig* = object
-    breakMarker*: string
+    inputPath*: string
+    dbPath*: string
     openaiConfig*: OpenAIConfig
     networkConfig*: NetworkConfig
     sqliteConfig*: SqliteConfig
-
-  IngestCliConfig* = object
-    inputPath*: string
-    dbPath*: string
-    runtime*: RuntimeConfig
-
-  SearchCliConfig* = object
-    dbPath*: string
-    runtime*: RuntimeConfig
 
   InputChunk* = object
     source*: string
@@ -55,6 +47,7 @@ type
     errorKind*: ChunkErrorKind
     errorMessage*: string
     httpStatus*: int
+
   SearchResult* = object
     id*: int64
     distance*: float
