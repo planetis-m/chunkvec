@@ -18,7 +18,7 @@ queries locally from that database.
 
 ## Design
 
-`chunkvec` uses the same small two-command shape as `chunktts`:
+`chunkvec` uses a small two-command shape:
 
 1. `cvstore`:
 - reads one input text file
