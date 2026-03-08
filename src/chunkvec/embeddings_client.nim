@@ -14,14 +14,13 @@ proc requestEmbeddingWithRetry*(client: Relay; cfg: RuntimeConfig;
     text: sink string): seq[float32] =
   let maxAttempts = max(1, cfg.networkConfig.maxRetries + 1)
   let retryPolicy = defaultRetryPolicy(maxAttempts = maxAttempts)
-  let requestText = move text
   var rng = initRand(getMonoTime().ticks)
   var attempt = 1
 
   while true:
     let item = client.makeRequest(embeddingRequest(
       cfg.openaiConfig,
-      buildEmbeddingParams(cfg, requestText),
+      buildEmbeddingParams(cfg, text),
       requestId = attempt,
       timeoutMs = cfg.networkConfig.totalTimeoutMs
     ))

@@ -4,7 +4,7 @@ import ./[constants, types]
 
 export db_sqlite
 
-proc packFloat32Blob*(values: openArray[float32]): seq[byte] =
+proc packFloat32Blob*(values: seq[float32]): seq[byte] =
   result = newSeq[byte](values.len * sizeof(float32))
   if result.len > 0:
     copyMem(addr result[0], addr values[0], result.len)
@@ -27,17 +27,9 @@ proc sqlite3LoadExtension(db: DbConn; file: cstring; procName: cstring;
     errMsg: ptr cstring): int32 {.
     cdecl, dynlib: SqliteDynlib, importc: "sqlite3_load_extension".}
 
-proc sqliteError(db: DbConn; action: string): ref IOError {.noinline.} =
-  let message =
-    if db.isNil:
-      action
-    else:
-      action & ": " & $sqlite3.errmsg(db)
-  result = newException(IOError, message)
-
-proc checkSqliteRc(db: DbConn; rc: int32; action: string) =
+proc checkSqliteRc(db: DbConn; rc: int32) =
   if rc != SQLITE_OK:
-    raise db.sqliteError(action)
+    dbError(db)
 
 proc textColumn(row: InstantRow; index: int32): string =
   let value = unsafeColumnAt(row, index)
@@ -51,10 +43,7 @@ proc openDatabase*(path: string): DbConn =
   result = db_sqlite.open(path, "", "", "")
 
 proc loadExtension*(db: DbConn; extensionPath: string) =
-  db.checkSqliteRc(
-    sqlite3EnableLoadExtension(db, 1),
-    "failed to enable sqlite extension loading"
-  )
+  db.checkSqliteRc(sqlite3EnableLoadExtension(db, 1))
 
   var errMsg: cstring = nil
   let rc = sqlite3LoadExtension(db, extensionPath, nil, addr errMsg)
@@ -65,7 +54,7 @@ proc loadExtension*(db: DbConn; extensionPath: string) =
       sqlite3.free(errMsg)
     raise newException(IOError, message)
 
-  db.checkSqliteRc(sqlite3EnableLoadExtension(db, 0), "failed to disable sqlite extension loading")
+  db.checkSqliteRc(sqlite3EnableLoadExtension(db, 0))
 
 proc initSchema*(db: DbConn) =
   db.exec(sql(
@@ -108,7 +97,7 @@ proc prepareInsertStatement*(db: DbConn): SqlPrepared =
   text,
   """ & EmbeddingColumn & """,
   metadata_json
-) VALUES (?, ?, ?, vector_as_f32(?), ?);
+) VALUES (?, ?, ?, ?, ?);
 """
   )
 
@@ -120,7 +109,7 @@ proc rebuildQuantization*(db: DbConn) =
 proc rowCount*(db: DbConn): int =
   result = parseInt(db.getValue(sql("SELECT COUNT(*) FROM " & TableName & ";")))
 
-proc runSearch(db: DbConn; scanProc: string; queryVector: openArray[float32];
+proc runSearch(db: DbConn; scanProc: string; queryVector: seq[float32];
     topK: int): seq[SearchResult] =
   let query =
     """SELECT
@@ -158,6 +147,6 @@ ORDER BY v.distance ASC, c.id ASC;
     if not stmt.isNil:
       stmt.finalize()
 
-proc searchChunks*(db: DbConn; queryVector: openArray[float32];
+proc searchChunks*(db: DbConn; queryVector: seq[float32];
     topK: int): seq[SearchResult] =
   result = db.runSearch("vector_quantize_scan", queryVector, topK)
