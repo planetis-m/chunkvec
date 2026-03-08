@@ -1,8 +1,7 @@
 import std/[os, strutils, syncio]
 import relay
 import openai/[core, embeddings]
-import ./[chunk_store, constants, embeddings_client, logging, runtime_config,
-  types]
+import ./[chunk_store, constants, embeddings_client, logging, runtime_config, types]
 
 proc shutdownRelay(client: Relay; shouldAbort: bool) =
   if shouldAbort:

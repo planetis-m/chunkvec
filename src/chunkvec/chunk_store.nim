@@ -71,13 +71,10 @@ proc loadExtension*(db: DbConn; extensionPath: string) =
       sqlite3.free(errMsg)
     raise newException(IOError, message)
 
-  db.checkSqliteRc(
-    sqlite3EnableLoadExtension(db, 0),
-    "failed to disable sqlite extension loading"
-  )
+  db.checkSqliteRc(sqlite3EnableLoadExtension(db, 0), "failed to disable sqlite extension loading")
 
 proc initSchema*(db: DbConn) =
-  db.exec(sql(fmt"""
+  db.exec(sql(&"""
 CREATE TABLE IF NOT EXISTS {TableName} (
   id INTEGER PRIMARY KEY,
   source TEXT NOT NULL,
@@ -89,7 +86,7 @@ CREATE TABLE IF NOT EXISTS {TableName} (
   metadata_json TEXT,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );"""))
-  db.exec(sql(fmt"""
+  db.exec(sql(&"""
 CREATE INDEX IF NOT EXISTS idx_chunks_source_ordinal
   ON {TableName}(source, ordinal);"""))
 
@@ -103,16 +100,11 @@ proc rollbackTransaction*(db: DbConn) =
   db.exec(sql"ROLLBACK;")
 
 proc initializeVectorTable*(db: DbConn) =
-  let options = fmt"type={VectorType},dimension={EmbeddingDimension},distance={DistanceMetric}"
-  discard db.getValue(
-    sql"SELECT vector_init(?, ?, ?);",
-    TableName,
-    EmbeddingColumn,
-    options
-  )
+  let options = &"type={VectorType},dimension={EmbeddingDimension},distance={DistanceMetric}"
+  discard db.getValue(sql"SELECT vector_init(?, ?, ?);", TableName, EmbeddingColumn, options)
 
 proc prepareInsertStatement*(db: DbConn): SqlPrepared =
-  result = db.prepare(fmt"""
+  result = db.prepare(&"""
 INSERT INTO {TableName}(
   source,
   ordinal,
@@ -152,24 +144,15 @@ proc insertChunk*(db: DbConn; stmt: SqlPrepared; record: ChunkRecord) =
 
 proc rebuildQuantization*(db: DbConn) =
   let options = "qtype=" & QuantizationType
-  discard db.getValue(
-    sql"SELECT vector_quantize(?, ?, ?);",
-    TableName,
-    EmbeddingColumn,
-    options
-  )
-  discard db.getValue(
-    sql"SELECT vector_quantize_preload(?, ?);",
-    TableName,
-    EmbeddingColumn
-  )
+  discard db.getValue(sql"SELECT vector_quantize(?, ?, ?);", TableName, EmbeddingColumn, options)
+  discard db.getValue(sql"SELECT vector_quantize_preload(?, ?);", TableName, EmbeddingColumn)
 
 proc rowCount*(db: DbConn): int =
-  result = parseInt(db.getValue(sql(fmt"SELECT COUNT(*) FROM {TableName};")))
+  result = parseInt(db.getValue(sql(&"SELECT COUNT(*) FROM {TableName};")))
 
 proc runSearch(db: DbConn; scanProc: string; queryVector: openArray[float32];
     topK: int): seq[SearchResult] =
-  let query = fmt"""
+  let query = &"""
 SELECT
   c.id,
   v.distance,
