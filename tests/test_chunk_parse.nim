@@ -53,6 +53,12 @@ proc testRejectMissingRequiredDoc() =
     discard parseInputChunks("slides.md", """<chunk kind=source position=12>
 Hello""")
 
+proc testRejectAssessmentKind() =
+  doAssertRaises(ValueError):
+    discard parseInputChunks("slides.md",
+      """<chunk doc="ml-unit-1" kind=assessment position=12>
+Hello""")
+
 proc testRejectEmptyChunkBody() =
   doAssertRaises(ValueError):
     discard parseInputChunks("slides.md",
@@ -64,4 +70,5 @@ when isMainModule:
   testRejectUnknownAttribute()
   testRejectMissingMarker()
   testRejectMissingRequiredDoc()
+  testRejectAssessmentKind()
   testRejectEmptyChunkBody()

@@ -55,7 +55,7 @@ proc testSqliteVectorRoundTrip() =
     "gamma",
     unitVector(0),
     "ml-unit-2",
-    "assessment",
+    "derived",
     7,
     "Deep Intro"
   )
@@ -79,9 +79,10 @@ proc testSqliteVectorRoundTrip() =
   doAssert docRows[1].metadata.docId == "ml-unit-1"
 
   let kindRows = db.searchChunks(unitVector(0), 3,
-    SearchFilters(kind: assessment))
-  doAssert kindRows.len == 1
+    SearchFilters(kind: derived))
+  doAssert kindRows.len == 2
   doAssert kindRows[0].text == "gamma"
+  doAssert kindRows[1].text == "beta"
 
   let labelRows = db.searchChunks(unitVector(0), 3,
     SearchFilters(labelSubstring: "introbas"))
@@ -91,7 +92,7 @@ proc testSqliteVectorRoundTrip() =
   let combinedRows = db.searchChunks(unitVector(0), 3,
     SearchFilters(
       docId: "ml-unit-2",
-      kind: assessment,
+      kind: derived,
       position: 7,
       labelSubstring: "deep intro"
     ))

@@ -7,8 +7,7 @@ type
   ChunkKind* = enum
     none,
     source,
-    derived,
-    assessment
+    derived
 
   ChunkMetadata* = object
     docId*: string
@@ -76,8 +75,6 @@ proc parseChunkKind*(text: string): ChunkKind {.inline.} =
     result = source
   of "derived":
     result = derived
-  of "assessment":
-    result = assessment
   else:
     result = none
 

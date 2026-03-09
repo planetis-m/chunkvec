@@ -32,6 +32,13 @@ proc testRejectMissingBlankLine() =
       """<search position=12>
 How do embeddings help search?""")
 
+proc testRejectAssessmentKind() =
+  doAssertRaises(ValueError):
+    discard parseSearchInput("query.txt",
+      """<search kind=assessment>
+
+How do embeddings help search?""")
+
 proc testRejectEmptyQueryText() =
   let parsed = parseSearchInput("query.txt",
     """<search label="Intro">
@@ -44,4 +51,5 @@ when isMainModule:
   testMarkerWithPageAndSection()
   testRejectUnknownAttribute()
   testRejectMissingBlankLine()
+  testRejectAssessmentKind()
   testRejectEmptyQueryText()

@@ -66,7 +66,7 @@ proc initSchema*(db: DbConn) =
   text TEXT NOT NULL,
   """ & EmbeddingColumn & """ BLOB NOT NULL,
   doc_id TEXT NOT NULL,
-  kind TEXT NOT NULL CHECK (kind IN ('source', 'derived', 'assessment')),
+  kind TEXT NOT NULL CHECK (kind IN ('source', 'derived')),
   position INTEGER NOT NULL,
   label TEXT NOT NULL,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP

@@ -108,11 +108,11 @@ proc processEmbeddingSuccess(cfg: RuntimeConfig; chunks: seq[InputChunk]; seqId:
     if embeddingLen != cfg.embeddingDimension:
       state.finalizeChunk(succeeded = false)
     else:
-      var record = ChunkRecord(
+      let record = ChunkRecord(
         chunk: chunks[seqId],
         embedding: move embedding(parsed)
       )
-      db.insertRecord(insertStmt, move record, state)
+      db.insertRecord(insertStmt, record, state)
       state.finalizeChunk(succeeded = true)
 
 proc processResult(cfg: RuntimeConfig; chunks: seq[InputChunk]; item: RequestResult;

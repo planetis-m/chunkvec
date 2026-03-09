@@ -182,7 +182,7 @@ Rules:
 - leading file whitespace before the first marker is ignored
 - every chunk must start with `<chunk ...>`
 - `doc` is required and must be a non-empty double-quoted string
-- `kind` is required and must be one of `source`, `derived`, `assessment`
+- `kind` is required and must be one of `source`, `derived`
 - `position` is required and must be an integer
 - `label` is optional and must be double-quoted when present
 - unknown marker attributes are rejected
@@ -244,8 +244,8 @@ Search:
 
 Search filter rules:
 
-- `doc` is an exact match filter on the logical material id
-- `kind` is an exact match filter on `source`, `derived`, or `assessment`
+- `doc` is an exact match filter on the logical document id
+- `kind` is an exact match filter on `source` or `derived`
 - `position` is an exact integer filter
 - `label` is a substring filter after `strutils.normalize` on both sides
 - `strutils.normalize` lowercases ASCII and removes `_`

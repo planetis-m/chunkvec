@@ -22,7 +22,7 @@ proc parseSearchMarker(text: string; filters: var SearchFilters; startPos: int):
       let parsed = parseIdent(text, kindName, pos)
       kind = parseChunkKind(kindName)
       if parsed == 0 or kind == none:
-        failParse("kind must be one of source, derived, assessment")
+        failParse("kind must be one of source, derived")
       pos.inc(parsed)
     of "position":
       let parsed = parseInt(text, position, pos)

@@ -34,7 +34,7 @@ proc parseChunkMarker(text: string; metadata: var ChunkMetadata; startPos: int):
       let parsed = parseIdent(text, kindName, pos)
       kind = parseChunkKind(kindName)
       if parsed == 0 or kind == ChunkKind.none:
-        failParse("kind must be one of source, derived, assessment")
+        failParse("kind must be one of source, derived")
       pos.inc(parsed)
     of "position":
       let parsed = parseInt(text, position, pos)
