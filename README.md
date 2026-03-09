@@ -29,7 +29,7 @@ queries locally from that database.
 
 2. `cvquery`:
 - reads one query text file
-- optionally parses a leading `<search ...>` filter header
+- optionally applies CLI filter flags such as `--doc` and `--kind`
 - embeds that query through the same built-in model
 - prints top matches from the local SQLite database
 
@@ -139,13 +139,13 @@ Built-in defaults:
 
 ```bash
 ./cvstore [--source=RELATIVEPATH] INPUT.txt DB.sqlite
-./cvquery QUERY.txt DB.sqlite
+./cvquery [--doc=DOC] [--kind=source|derived] [--position=N] [--label=TEXT] QUERY.txt DB.sqlite
 ./cvstore --help
 ./cvquery --help
 ```
 
 - `cvstore` takes `[--source=RELATIVEPATH] INPUT.txt DB.sqlite`
-- `cvquery` takes `QUERY.txt DB.sqlite`
+- `cvquery` takes `[--doc=DOC] [--kind=source|derived] [--position=N] [--label=TEXT] QUERY.txt DB.sqlite`
 - `stdout` is used only for search results
 - logs and fatal errors go to `stderr`
 
@@ -210,14 +210,6 @@ Prepare a query:
 How do embeddings help search?
 ```
 
-Filtered query example:
-
-```text
-<search doc="notes-course" kind=source position=5 label="vector_search">
-
-How do embeddings help search?
-```
-
 Set your API key:
 
 ```bash
@@ -233,14 +225,10 @@ Ingest:
 Search:
 
 ```bash
-./cvquery query.txt notes.sqlite
+./cvquery --doc=notes-course --kind=source --position=5 --label=vector_search query.txt notes.sqlite
 ```
 
-`cvquery` accepts either:
-
-- a plain query file containing only the semantic query text
-- or an optional leading `<search ...>` header followed by a blank line and the
-  query text
+`cvquery` reads a plain query file containing only the semantic query text.
 
 Search filter rules:
 
@@ -249,7 +237,7 @@ Search filter rules:
 - `position` is an exact integer filter
 - `label` is a substring filter after `strutils.normalize` on both sides
 - `strutils.normalize` lowercases ASCII and removes `_`
-- if multiple filters are present, all must match
+- if multiple CLI filters are present, all must match
 - query text is still required even when filters are present
 
 Typical output:

@@ -21,10 +21,6 @@ type
     position*: int = NoPositionFilter
     labelSubstring*: string
 
-  SearchInput* = object
-    queryText*: string
-    filters*: SearchFilters
-
   NetworkConfig* = object
     maxInflight*: int
     totalTimeoutMs*: int
@@ -37,6 +33,7 @@ type
     inputPath*: string
     dbPath*: string
     sourcePath*: string
+    searchFilters*: SearchFilters
     model*: string
     embeddingDimension*: int
     topK*: int

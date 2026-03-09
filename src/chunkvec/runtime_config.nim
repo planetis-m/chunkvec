@@ -1,4 +1,4 @@
-import std/[envvars, files, parseopt, paths]
+import std/[envvars, files, parseopt, paths, strutils]
 from std/os import getAppDir
 import jsonx
 import openai/core
@@ -12,6 +12,7 @@ type
     inputPath: string
     dbPath: string
     sourcePath: string
+    searchFilters: SearchFilters
 
   JsonRuntimeConfig = object
     api_key: string
@@ -26,10 +27,14 @@ type
 const HelpText = """
 Usage:
   cvstore [--source=RELATIVEPATH] INPUT.txt DB.sqlite
-  cvquery QUERY.txt DB.sqlite
+  cvquery [--doc=DOC] [--kind=source|derived] [--position=N] [--label=TEXT] QUERY.txt DB.sqlite
 
 Options:
   --source=PATH    Optional stored chunk source for cvstore.
+  --doc=DOC        Exact-match query filter for logical document id.
+  --kind=KIND      Exact-match query filter for source or derived.
+  --position=N     Exact-match query filter for integer position.
+  --label=TEXT     Substring query filter for chunk label.
   --help, -h       Show this help and exit.
 """
 
@@ -79,8 +84,19 @@ template ifNonNegative(value, fallback: untyped): untyped =
   if value >= 0: value
   else: fallback
 
+proc parseSearchFilterPosition(val: string): int =
+  try:
+    result = parseInt(val)
+  except ValueError:
+    cliError("invalid value for --position: " & val)
+
 proc parseCliArgs(cliArgs: seq[string]): CliArgs =
-  result = CliArgs(inputPath: "", dbPath: "", sourcePath: "")
+  result = CliArgs(
+    inputPath: "",
+    dbPath: "",
+    sourcePath: "",
+    searchFilters: initSearchFilters()
+  )
   var parser = initOptParser(cliArgs)
 
   for kind, key, val in parser.getopt():
@@ -99,6 +115,24 @@ proc parseCliArgs(cliArgs: seq[string]): CliArgs =
         if val.len == 0:
           cliError("missing value for --source")
         result.sourcePath = val
+      elif key == "doc":
+        if val.len == 0:
+          cliError("missing value for --doc")
+        result.searchFilters.docId = val
+      elif key == "kind":
+        if val.len == 0:
+          cliError("missing value for --kind")
+        result.searchFilters.kind = parseChunkKind(val)
+        if result.searchFilters.kind == none:
+          cliError("invalid value for --kind: " & val)
+      elif key == "position":
+        if val.len == 0:
+          cliError("missing value for --position")
+        result.searchFilters.position = parseSearchFilterPosition(val)
+      elif key == "label":
+        if val.len == 0:
+          cliError("missing value for --label")
+        result.searchFilters.labelSubstring = val
       else:
         cliError("unknown option: --" & key)
     of cmdShortOption:
@@ -125,6 +159,7 @@ proc buildRuntimeConfig*(cliArgs: seq[string]): RuntimeConfig =
     inputPath: parsed.inputPath,
     dbPath: parsed.dbPath,
     sourcePath: parsed.sourcePath,
+    searchFilters: parsed.searchFilters,
     model: ifNonEmpty(rawConfig.model, Model),
     embeddingDimension: ifPositive(rawConfig.embedding_dimension, EmbeddingDimension),
     topK: ifPositive(rawConfig.top_k, TopK),

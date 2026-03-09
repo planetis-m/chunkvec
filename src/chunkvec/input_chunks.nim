@@ -1,9 +1,123 @@
 import std/[parseutils, strutils]
-import ./[marker_parser, types]
+import ./types
 
 const
   ChunkMarkerName = "chunk"
   ChunkMarkerPrefix = "<chunk"
+
+proc failParse(message: string) {.noreturn.} =
+  raise newException(ValueError, message)
+
+proc skipMarkerWhitespace(text: string; pos: var int) =
+  pos.inc(skipWhitespace(text, pos))
+
+proc parseQuotedValue(text: string; value: var string; start: int): int =
+  var pos = start
+  if pos >= text.len or text[pos] != '"':
+    return 0
+
+  inc pos
+  let valueStart = pos
+  let valueLen = skipUntil(text, '"', pos)
+  if pos + valueLen >= text.len:
+    return 0
+
+  value = text.substr(valueStart, valueStart + valueLen - 1)
+  pos.inc(valueLen)
+  inc pos
+  result = pos - start
+
+proc parseChunkMarkerHeader(text, markerName: string; startPos: int;
+    metadata: var ChunkMetadata; parseAttr:
+    proc(text, attrName: string; pos: var int; metadata: var ChunkMetadata) {.nimcall.}): int =
+  var pos = startPos
+  if pos >= text.len or text[pos] != '<':
+    return 0
+
+  inc pos
+
+  var parsedName = ""
+  let markerLen = parseIdent(text, parsedName, pos)
+  if markerLen == 0 or parsedName != markerName:
+    return 0
+
+  pos.inc(markerLen)
+
+  while true:
+    skipMarkerWhitespace(text, pos)
+    if pos >= text.len:
+      return 0
+    if text[pos] == '>':
+      inc pos
+      return pos - startPos
+
+    var attrName = ""
+    let attrLen = parseIdent(text, attrName, pos)
+    if attrLen == 0:
+      return 0
+
+    pos.inc(attrLen)
+    skipMarkerWhitespace(text, pos)
+    if pos >= text.len or text[pos] != '=':
+      return 0
+
+    inc pos
+    skipMarkerWhitespace(text, pos)
+    parseAttr(text, attrName, pos, metadata)
+
+proc parseChunkMetadataAttr(text, attrName: string; pos: var int;
+    metadata: var ChunkMetadata) {.nimcall.} =
+  case attrName
+  of "doc":
+    let parsed = parseQuotedValue(text, metadata.docId, pos)
+    if parsed == 0:
+      failParse("doc must use a double-quoted string")
+    pos.inc(parsed)
+  of "kind":
+    var kindName = ""
+    let parsed = parseIdent(text, kindName, pos)
+    metadata.kind = parseChunkKind(kindName)
+    if parsed == 0 or metadata.kind == ChunkKind.none:
+      failParse("kind must be one of source, derived")
+    pos.inc(parsed)
+  of "position":
+    let parsed = parseInt(text, metadata.position, pos)
+    if parsed == 0:
+      failParse("position must be an integer")
+    pos.inc(parsed)
+  of "label":
+    let parsed = parseQuotedValue(text, metadata.label, pos)
+    if parsed == 0:
+      failParse("label must use a double-quoted string")
+    pos.inc(parsed)
+  else:
+    failParse("unknown attribute " & attrName)
+
+proc markerAtLineStart(text: string; pos: int; prefix: string): bool =
+  if pos < 0 or pos + prefix.len > text.len:
+    return false
+  if skip(text, prefix, pos) == 0:
+    return false
+
+  var i = pos - 1
+  while i >= 0 and text[i] notin {'\n', '\r'}:
+    if text[i] notin {' ', '\t'}:
+      return false
+    dec i
+
+  result = true
+
+proc findNextMarker(text: string; startPos: int; prefix: string): int =
+  result = text.len
+  var pos = startPos
+  while pos < text.len:
+    let i = text.find(prefix, pos)
+    if i < 0:
+      break
+    if markerAtLineStart(text, i, prefix):
+      result = i
+      break
+    pos = i + prefix.len
 
 proc trimChunkBounds(text: string; startPos, endPos: int): Slice[int] =
   var first = startPos
@@ -17,52 +131,23 @@ proc trimChunkBounds(text: string; startPos, endPos: int): Slice[int] =
   result = first ..< last
 
 proc parseChunkMarker(text: string; metadata: var ChunkMetadata; startPos: int): int =
-  var docId = ""
-  var kind = none
-  var position = NoPositionFilter
-  var label = ""
+  metadata = ChunkMetadata(
+    docId: "",
+    kind: none,
+    position: NoPositionFilter,
+    label: ""
+  )
 
-  let parsedLen = parseMarker(ChunkMarkerName, pos, attrName):
-    case attrName
-    of "doc":
-      let parsed = parseQuotedValue(text, docId, pos)
-      if parsed == 0:
-        failParse("doc must use a double-quoted string")
-      pos.inc(parsed)
-    of "kind":
-      var kindName = ""
-      let parsed = parseIdent(text, kindName, pos)
-      kind = parseChunkKind(kindName)
-      if parsed == 0 or kind == ChunkKind.none:
-        failParse("kind must be one of source, derived")
-      pos.inc(parsed)
-    of "position":
-      let parsed = parseInt(text, position, pos)
-      if parsed == 0:
-        failParse("position must be an integer")
-      pos.inc(parsed)
-    of "label":
-      let parsed = parseQuotedValue(text, label, pos)
-      if parsed == 0:
-        failParse("label must use a double-quoted string")
-      pos.inc(parsed)
-    else:
-      failParse("unknown attribute " & attrName)
+  let parsedLen = parseChunkMarkerHeader(text, ChunkMarkerName, startPos, metadata,
+    parseChunkMetadataAttr)
   if parsedLen == 0:
     return 0
-  if docId.len == 0:
+  if metadata.docId.len == 0:
     failParse("missing required doc attribute")
-  if kind == none:
+  if metadata.kind == none:
     failParse("missing required kind attribute")
-  if position == NoPositionFilter:
+  if metadata.position == NoPositionFilter:
     failParse("missing required position attribute")
-
-  metadata = ChunkMetadata(
-    docId: docId,
-    kind: kind,
-    position: position,
-    label: label
-  )
   result = parsedLen
 
 proc parseInputChunks*(source, text: string): seq[InputChunk] =
