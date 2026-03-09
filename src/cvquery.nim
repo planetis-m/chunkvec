@@ -10,15 +10,16 @@ proc shutdownRelay(client: Relay; shouldAbort: bool) =
     client.close()
 
 proc renderResult(row: SearchResult; rank: int) =
-  let header = $rank & ". distance=" & formatFloat(row.distance, ffDecimal, 6) &
-    " source=" & row.source & " ordinal=" & $row.ordinal &
+  var header = $rank & ". distance=" & formatFloat(row.distance, ffDecimal, 6) &
+    " ordinal=" & $row.ordinal &
     " doc=\"" & row.metadata.docId & "\"" &
     " kind=" & $row.metadata.kind &
     " position=" & $row.metadata.position
-  if row.metadata.label.len == 0:
-    echo header
-  else:
-    echo header, " label=\"", row.metadata.label, "\""
+  if row.source.len > 0:
+    header.add " source=" & row.source
+  if row.metadata.label.len > 0:
+    header.add " label=\"" & row.metadata.label & "\""
+  echo header
   echo row.text
 
 proc runSearchApp*(): int =
