@@ -76,14 +76,6 @@ proc parseChunkKind*(text: string): ChunkKind {.inline.} =
   else:
     result = none
 
-proc initSearchFilters*(): SearchFilters {.inline.} =
-  result = SearchFilters(
-    docId: "",
-    kind: none,
-    position: NoPositionFilter,
-    labelSubstring: ""
-  )
-
 proc hasFilters*(filters: SearchFilters): bool {.inline.} =
   result = filters.docId.len > 0 or filters.kind != none or
     filters.position != NoPositionFilter or filters.labelSubstring.len > 0

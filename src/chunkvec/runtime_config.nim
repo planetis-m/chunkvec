@@ -95,7 +95,7 @@ proc parseCliArgs(cliArgs: seq[string]): CliArgs =
     inputPath: "",
     dbPath: "",
     sourcePath: "",
-    searchFilters: initSearchFilters()
+    searchFilters: SearchFilters()
   )
   var parser = initOptParser(cliArgs)
 

@@ -39,7 +39,6 @@ proc requestEmbeddingWithRetry*(client: Relay; cfg: RuntimeConfig;
       let embeddingLen = embedding(parsed).len
       if embeddingLen != cfg.embeddingDimension:
         raise newException(ValueError, "embedding dimension mismatch: expected " &
-          $cfg.embeddingDimension &
-          ", got " & $embeddingLen)
+          $cfg.embeddingDimension & ", got " & $embeddingLen)
       result = move embedding(parsed)
       break

@@ -1,7 +1,6 @@
 import std/[os, strutils]
 import relay
-import ./chunkvec/[chunk_store, constants, embeddings_client, logging, runtime_config,
-  types]
+import ./chunkvec/[chunk_store, constants, embeddings_client, logging, runtime_config, types]
 
 proc shutdownRelay(client: Relay; shouldAbort: bool) =
   if shouldAbort:

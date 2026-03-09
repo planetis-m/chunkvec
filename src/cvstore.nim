@@ -1,7 +1,6 @@
 import std/os
 import relay
-import ./chunkvec/[constants, chunk_store, input_chunks, logging, pipeline,
-  runtime_config, types]
+import ./chunkvec/[constants, chunk_store, input_chunks, logging, pipeline, runtime_config, types]
 
 proc shutdownRelay(client: Relay; shouldAbort: bool) =
   if shouldAbort:

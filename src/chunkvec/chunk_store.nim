@@ -241,7 +241,7 @@ JOIN vector_quantize_scan('""" & TableName & """', '""" &
       stmt.finalize()
 
 proc searchChunks*(db: DbConn; queryVector: seq[float32]; topK: int;
-    filters = initSearchFilters()): seq[SearchResult] =
+    filters = SearchFilters()): seq[SearchResult] =
   if filters.hasFilters:
     result = db.runFilteredSearch(queryVector, filters, topK)
   else:

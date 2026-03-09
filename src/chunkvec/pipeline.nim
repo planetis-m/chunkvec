@@ -1,8 +1,7 @@
 import std/[monotimes, os, random, times]
 import relay
 import openai/[core, embeddings, retry]
-import ./[embeddings_client, request_id_codec, retry_and_errors, retry_queue,
-  chunk_store, types]
+import ./[embeddings_client, request_id_codec, retry_and_errors, retry_queue, chunk_store, types]
 
 const
   RetryPollSliceMs = 25
