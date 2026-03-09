@@ -10,6 +10,11 @@ switch("passC", "-DCURL_DISABLE_TYPECHECK")
 when not defined(windows):
   switch("passL", "-lcurl")
 
+when defined(linux):
+  # sqlite extensions are loaded into this process and may rely on libm symbols
+  # such as `fmaxf`.
+  switch("passL", "-lm")
+
 when defined(macosx):
   switch("passC", "-I" & staticExec("brew --prefix curl") & "/include")
   switch("passL", "-L" & staticExec("brew --prefix curl") & "/lib")
