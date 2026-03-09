@@ -138,13 +138,13 @@ Built-in defaults:
 ## CLI
 
 ```bash
-./cvstore INPUT.txt DB.sqlite
+./cvstore [--source=RELATIVEPATH] INPUT.txt DB.sqlite
 ./cvquery QUERY.txt DB.sqlite
 ./cvstore --help
 ./cvquery --help
 ```
 
-- `cvstore` takes `INPUT.txt DB.sqlite`
+- `cvstore` takes `[--source=RELATIVEPATH] INPUT.txt DB.sqlite`
 - `cvquery` takes `QUERY.txt DB.sqlite`
 - `stdout` is used only for search results
 - logs and fatal errors go to `stderr`
@@ -227,7 +227,7 @@ export DEEPINFRA_API_KEY=...
 Ingest:
 
 ```bash
-./cvstore notes.txt notes.sqlite
+./cvstore --source=course/notes.md notes.txt notes.sqlite
 ```
 
 Search:
@@ -255,10 +255,10 @@ Search filter rules:
 Typical output:
 
 ```text
-1. distance=0.123456 source=notes.txt ordinal=1 doc="notes-course" kind=source position=4 label="Embeddings"
+1. distance=0.123456 source=course/notes.md ordinal=1 doc="notes-course" kind=source position=4 label="Embeddings"
 Embeddings map text into vectors where similar meanings stay close.
 
-2. distance=0.187654 source=notes.txt ordinal=2 doc="notes-course" kind=source position=5 label="Vector Search"
+2. distance=0.187654 source=course/notes.md ordinal=2 doc="notes-course" kind=source position=5 label="Vector Search"
 Nearest-neighbor search compares a query vector against stored vectors.
 ```
 

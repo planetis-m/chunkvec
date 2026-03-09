@@ -7,5 +7,6 @@ task test, "Run CI tests":
   runTest "nim c -r tests/test_chunk_parse.nim"
   runTest "nim c -r tests/test_embeddings_client.nim"
   runTest "nim c -r tests/test_request_id_codec.nim"
+  runTest "nim c -r tests/test_runtime_config.nim"
   runTest "nim c -r tests/test_search_input.nim"
   runTest "nim c -r tests/test_sqlite_vector_integration.nim"

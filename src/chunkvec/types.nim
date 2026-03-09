@@ -36,6 +36,7 @@ type
   RuntimeConfig* = object
     inputPath*: string
     dbPath*: string
+    sourcePath*: string
     model*: string
     embeddingDimension*: int
     topK*: int

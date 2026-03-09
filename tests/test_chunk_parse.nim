@@ -1,3 +1,4 @@
+import std/os
 import ../src/chunkvec/[input_chunks, types]
 
 proc testPageMarkerChunk() =
@@ -64,6 +65,26 @@ proc testRejectEmptyChunkBody() =
     discard parseInputChunks("slides.md",
       "<chunk doc=\"ml-unit-1\" kind=source position=1>\n\n")
 
+proc testLoadInputChunksUsesSourcePath() =
+  let path = "tests/test_chunk_parse_input.txt"
+  writeFile(path, """<chunk doc="ml-unit-1" kind=source position=1 label="Intro">
+Hello""")
+  defer:
+    removeFile(path)
+  let chunks = loadInputChunks(path, "course/week-1-notes.md")
+  doAssert chunks.len == 1
+  doAssert chunks[0].source == "course/week-1-notes.md"
+
+proc testLoadInputChunksKeepsEmptySourcePath() =
+  let path = "tests/test_chunk_parse_input.txt"
+  writeFile(path, """<chunk doc="ml-unit-1" kind=source position=1 label="Intro">
+Hello""")
+  defer:
+    removeFile(path)
+  let chunks = loadInputChunks(path, "")
+  doAssert chunks.len == 1
+  doAssert chunks[0].source.len == 0
+
 when isMainModule:
   testPageMarkerChunk()
   testMultipleChunks()
@@ -72,3 +93,5 @@ when isMainModule:
   testRejectMissingRequiredDoc()
   testRejectAssessmentKind()
   testRejectEmptyChunkBody()
+  testLoadInputChunksUsesSourcePath()
+  testLoadInputChunksKeepsEmptySourcePath()

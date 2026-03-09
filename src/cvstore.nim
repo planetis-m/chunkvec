@@ -24,7 +24,7 @@ proc runIngestApp*(): int =
     if not fileExists(cfg.inputPath):
       raise newException(ValueError, "input file does not exist: " & cfg.inputPath)
 
-    let chunks = loadInputChunks(cfg.inputPath)
+    let chunks = loadInputChunks(cfg.inputPath, cfg.sourcePath)
     if chunks.len == 0:
       raise newException(ValueError, "input did not produce any non-empty chunks")
 

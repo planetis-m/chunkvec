@@ -94,5 +94,5 @@ proc parseInputChunks*(source, text: string): seq[InputChunk] =
     pos = nextMarkerPos
     inc ordinal
 
-proc loadInputChunks*(path: string): seq[InputChunk] =
-  result = parseInputChunks(path, readFile(path))
+proc loadInputChunks*(path, sourcePath: string): seq[InputChunk] =
+  result = parseInputChunks(sourcePath, readFile(path))

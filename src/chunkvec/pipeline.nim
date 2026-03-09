@@ -135,8 +135,7 @@ proc processResult(cfg: RuntimeConfig; chunks: seq[InputChunk]; item: RequestRes
     if item.error.kind != teNone or not isHttpSuccess(item.response.code):
       state.finalizeChunk(succeeded = false)
     else:
-      processEmbeddingSuccess(cfg, chunks, seqId, item.response.body, db, insertStmt,
-        state)
+      processEmbeddingSuccess(cfg, chunks, seqId, item.response.body, db, insertStmt, state)
     dec state.activeCount
 
 proc drainReadyResults(cfg: RuntimeConfig; chunks: seq[InputChunk]; client: Relay;

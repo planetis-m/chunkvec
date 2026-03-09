@@ -11,6 +11,7 @@ type
   CliArgs = object
     inputPath: string
     dbPath: string
+    sourcePath: string
 
   JsonRuntimeConfig = object
     api_key: string
@@ -24,10 +25,11 @@ type
 
 const HelpText = """
 Usage:
-  cvstore INPUT.txt DB.sqlite
+  cvstore [--source=RELATIVEPATH] INPUT.txt DB.sqlite
   cvquery QUERY.txt DB.sqlite
 
 Options:
+  --source=PATH    Optional stored chunk source for cvstore.
   --help, -h       Show this help and exit.
 """
 
@@ -78,7 +80,7 @@ template ifNonNegative(value, fallback: untyped): untyped =
   else: fallback
 
 proc parseCliArgs(cliArgs: seq[string]): CliArgs =
-  result = CliArgs(inputPath: "", dbPath: "")
+  result = CliArgs(inputPath: "", dbPath: "", sourcePath: "")
   var parser = initOptParser(cliArgs)
 
   for kind, key, val in parser.getopt():
@@ -93,6 +95,10 @@ proc parseCliArgs(cliArgs: seq[string]): CliArgs =
     of cmdLongOption:
       if key == "help":
         quit(HelpText, ExitAllOk)
+      elif key == "source":
+        if val.len == 0:
+          cliError("missing value for --source")
+        result.sourcePath = val
       else:
         cliError("unknown option: --" & key)
     of cmdShortOption:
@@ -118,6 +124,7 @@ proc buildRuntimeConfig*(cliArgs: seq[string]): RuntimeConfig =
   result = RuntimeConfig(
     inputPath: parsed.inputPath,
     dbPath: parsed.dbPath,
+    sourcePath: parsed.sourcePath,
     model: ifNonEmpty(rawConfig.model, Model),
     embeddingDimension: ifPositive(rawConfig.embedding_dimension, EmbeddingDimension),
     topK: ifPositive(rawConfig.top_k, TopK),
