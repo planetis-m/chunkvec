@@ -42,6 +42,7 @@ proc isNil(stmt: SqlPrepared): bool {.inline.} =
 
 proc openDatabase*(path: string): DbConn =
   result = db_sqlite.open(path, "", "", "")
+  result.exec(sql"PRAGMA foreign_keys = ON;")
 
 proc loadExtension*(db: DbConn; extensionPath: string) =
   db.checkSqliteRc(sqlite3EnableLoadExtension(db, 1))
@@ -59,26 +60,35 @@ proc loadExtension*(db: DbConn; extensionPath: string) =
 
 proc initSchema*(db: DbConn) =
   db.exec(sql(
-    """CREATE TABLE IF NOT EXISTS """ & TableName & """ (
+    """CREATE TABLE IF NOT EXISTS """ & ArtifactTableName & """ (
   id INTEGER PRIMARY KEY,
   source TEXT NOT NULL,
-  ordinal INTEGER NOT NULL,
-  text TEXT NOT NULL,
-  """ & EmbeddingColumn & """ BLOB NOT NULL,
   doc_id TEXT NOT NULL,
   kind TEXT NOT NULL CHECK (kind IN ('source', 'derived')),
-  position INTEGER NOT NULL,
-  label TEXT NOT NULL,
-  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(doc_id, kind)
 );"""
   ))
   db.exec(sql(
-    """CREATE INDEX IF NOT EXISTS idx_chunks_source_ordinal
-  ON """ & TableName & """(source, ordinal);"""
+    """CREATE TABLE IF NOT EXISTS """ & TableName & """ (
+  id INTEGER PRIMARY KEY,
+  artifact_id INTEGER NOT NULL REFERENCES """ & ArtifactTableName &
+      """(id) ON DELETE CASCADE,
+  ordinal INTEGER NOT NULL,
+  text TEXT NOT NULL,
+  """ & EmbeddingColumn & """ BLOB NOT NULL,
+  position INTEGER NOT NULL,
+  label TEXT NOT NULL,
+  UNIQUE(artifact_id, ordinal)
+);"""
   ))
   db.exec(sql(
-    """CREATE INDEX IF NOT EXISTS idx_chunks_doc_kind_position
-  ON """ & TableName & """(doc_id, kind, position);"""
+    """CREATE INDEX IF NOT EXISTS idx_artifacts_doc_kind
+  ON """ & ArtifactTableName & """(doc_id, kind);"""
+  ))
+  db.exec(sql(
+    """CREATE INDEX IF NOT EXISTS idx_chunks_artifact_position
+  ON """ & TableName & """(artifact_id, position);"""
   ))
 
 proc beginTransaction*(db: DbConn) =
@@ -100,17 +110,28 @@ proc initializeVectorTable*(db: DbConn; embeddingDimension: int) =
 proc prepareInsertStatement*(db: DbConn): SqlPrepared =
   result = db.prepare(
     """INSERT INTO """ & TableName & """(
-  source,
+  artifact_id,
   ordinal,
   text,
   """ & EmbeddingColumn & """,
-  doc_id,
-  kind,
   position,
   label
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+) VALUES (?, ?, ?, ?, ?, ?);
 """
   )
+
+proc createArtifact*(db: DbConn; source, docId: string; kind: ChunkKind): int64 =
+  try:
+    db.exec(sql(
+      "INSERT INTO " & ArtifactTableName & "(source, doc_id, kind) VALUES (?, ?, ?);"
+    ), source, docId, $kind)
+    result = sqlite3.last_insert_rowid(db)
+  except DbError as err:
+    if err.msg.contains("UNIQUE constraint failed: " & ArtifactTableName & ".doc_id, " &
+        ArtifactTableName & ".kind"):
+      raise newException(ValueError,
+        "artifact already exists for doc=" & docId & " kind=" & $kind)
+    raise
 
 proc rebuildQuantization*(db: DbConn) =
   let options = "qtype=" & QuantizationType
@@ -140,14 +161,16 @@ proc runTopKSearch(db: DbConn; queryVector: seq[float32]; topK: int): seq[Search
     """SELECT
   c.id,
   v.distance,
-  c.source,
+  a.source,
   c.ordinal,
   c.text,
-  c.doc_id,
-  c.kind,
+  a.doc_id,
+  a.kind,
   c.position,
   c.label
 FROM """ & TableName & """ AS c
+JOIN """ & ArtifactTableName & """ AS a
+  ON a.id = c.artifact_id
 JOIN vector_quantize_scan('""" & TableName & """', '""" &
     EmbeddingColumn & """', ?, ?) AS v
   ON c.id = v.rowid
@@ -182,14 +205,16 @@ proc runFilteredSearch(db: DbConn; queryVector: seq[float32]; filters: SearchFil
     """SELECT
   c.id,
   v.distance,
-  c.source,
+  a.source,
   c.ordinal,
   c.text,
-  c.doc_id,
-  c.kind,
+  a.doc_id,
+  a.kind,
   c.position,
   c.label
 FROM """ & TableName & """ AS c
+JOIN """ & ArtifactTableName & """ AS a
+  ON a.id = c.artifact_id
 JOIN vector_quantize_scan('""" & TableName & """', '""" &
     EmbeddingColumn & """', ?) AS v
   ON c.id = v.rowid
@@ -197,11 +222,11 @@ JOIN vector_quantize_scan('""" & TableName & """', '""" &
 
   var haveWhereClause = false
   if filters.docId.len > 0:
-    query.add("WHERE c.doc_id = ?\n")
+    query.add("WHERE a.doc_id = ?\n")
     haveWhereClause = true
   if filters.kind != none:
     addWherePrefix()
-    query.add("c.kind = ?\n")
+    query.add("a.kind = ?\n")
   if filters.position != NoPositionFilter:
     addWherePrefix()
     query.add("c.position = ?\n")

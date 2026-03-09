@@ -48,15 +48,20 @@ proc runIngestApp*(): int =
     try:
       db.beginTransaction()
       transactionOpen = true
+      let artifactId = db.createArtifact(cfg.sourcePath, cfg.searchFilters.docId,
+        cfg.searchFilters.kind)
 
       client = newRelay(
         maxInFlight = cfg.networkConfig.maxInflight,
         defaultTimeoutMs = cfg.networkConfig.totalTimeoutMs
       )
 
-      pipelineResult = runPipeline(cfg, chunks, client, db, insertStmt)
+      pipelineResult = runPipeline(cfg, chunks, client, db, insertStmt, artifactId)
 
-      db.commitTransaction()
+      if pipelineResult.wroteRows:
+        db.commitTransaction()
+      else:
+        db.rollbackTransaction()
       transactionOpen = false
     finally:
       insertStmt.finalize()

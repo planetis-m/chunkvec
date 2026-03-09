@@ -15,6 +15,7 @@ const
   DistanceMetric* = "COSINE"
   QuantizationType* = "UINT8"
 
+  ArtifactTableName* = "artifacts"
   TableName* = "chunks"
   EmbeddingColumn* = "embedding"
 

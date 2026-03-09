@@ -32,15 +32,13 @@ proc initPipelineState(total: int): PipelineState =
   )
 
 proc insertRecord(db: DbConn; insertStmt: SqlPrepared; record: sink ChunkRecord;
-    cfg: RuntimeConfig; state: var PipelineState) =
+    artifactId: int64; state: var PipelineState) =
   db.exec(
     insertStmt,
-    cfg.sourcePath,
+    artifactId,
     record.chunk.ordinal,
     record.chunk.text,
     record.embedding,
-    cfg.searchFilters.docId,
-    $cfg.searchFilters.kind,
     record.chunk.position,
     record.chunk.label
   )
@@ -96,7 +94,8 @@ proc submitFreshAttempts(cfg: RuntimeConfig; chunks: seq[InputChunk]; maxInFligh
       inc state.nextSubmitSeqId
 
 proc processEmbeddingSuccess(cfg: RuntimeConfig; chunks: seq[InputChunk]; seqId: int;
-    body: string; db: DbConn; insertStmt: SqlPrepared; state: var PipelineState) =
+    body: string; db: DbConn; insertStmt: SqlPrepared; artifactId: int64;
+    state: var PipelineState) =
   var parsed: EmbeddingCreateResult
   if not embeddingParse(body, parsed):
     state.finalizeChunk(succeeded = false)
@@ -111,12 +110,12 @@ proc processEmbeddingSuccess(cfg: RuntimeConfig; chunks: seq[InputChunk]; seqId:
         chunk: chunks[seqId],
         embedding: move embedding(parsed)
       )
-      db.insertRecord(insertStmt, record, cfg, state)
+      db.insertRecord(insertStmt, record, artifactId, state)
       state.finalizeChunk(succeeded = true)
 
 proc processResult(cfg: RuntimeConfig; chunks: seq[InputChunk]; item: RequestResult;
     maxAttempts: int; retryPolicy: RetryPolicy; db: DbConn; insertStmt: SqlPrepared;
-    state: var PipelineState) =
+    artifactId: int64; state: var PipelineState) =
   let requestId = item.response.request.requestId
   let meta = unpackRequestId(requestId)
   let seqId = meta.seqId
@@ -134,29 +133,32 @@ proc processResult(cfg: RuntimeConfig; chunks: seq[InputChunk]; item: RequestRes
     if item.error.kind != teNone or not isHttpSuccess(item.response.code):
       state.finalizeChunk(succeeded = false)
     else:
-      processEmbeddingSuccess(cfg, chunks, seqId, item.response.body, db, insertStmt, state)
+      processEmbeddingSuccess(cfg, chunks, seqId, item.response.body, db, insertStmt,
+        artifactId, state)
     dec state.activeCount
 
 proc drainReadyResults(cfg: RuntimeConfig; chunks: seq[InputChunk]; client: Relay;
     maxAttempts: int; retryPolicy: RetryPolicy; db: DbConn; insertStmt: SqlPrepared;
-    state: var PipelineState): bool =
+    artifactId: int64; state: var PipelineState): bool =
   result = false
   var item: RequestResult
   while client.pollForResult(item):
-    processResult(cfg, chunks, item, maxAttempts, retryPolicy, db, insertStmt, state)
+    processResult(cfg, chunks, item, maxAttempts, retryPolicy, db, insertStmt, artifactId,
+      state)
     result = true
 
 proc waitForSingleResult(cfg: RuntimeConfig; chunks: seq[InputChunk]; client: Relay;
     maxAttempts: int; retryPolicy: RetryPolicy; db: DbConn; insertStmt: SqlPrepared;
-    state: var PipelineState) =
+    artifactId: int64; state: var PipelineState) =
   var item: RequestResult
   if not client.waitForResult(item):
     raise newException(IOError, "relay worker stopped before all results arrived")
-  processResult(cfg, chunks, item, maxAttempts, retryPolicy, db, insertStmt, state)
+  processResult(cfg, chunks, item, maxAttempts, retryPolicy, db, insertStmt, artifactId,
+    state)
 
 proc waitForProgress(cfg: RuntimeConfig; chunks: seq[InputChunk]; client: Relay;
     maxInFlight, maxAttempts: int; retryPolicy: RetryPolicy; db: DbConn;
-    insertStmt: SqlPrepared; state: var PipelineState) =
+    insertStmt: SqlPrepared; artifactId: int64; state: var PipelineState) =
   if state.inFlightCount == 0:
     let sleepMs = nextRetryDelayMs(state.retryQueue)
     if sleepMs < 0:
@@ -167,15 +169,15 @@ proc waitForProgress(cfg: RuntimeConfig; chunks: seq[InputChunk]; client: Relay;
     let nextRetryMs = nextRetryDelayMs(state.retryQueue)
     if nextRetryMs < 0:
       waitForSingleResult(cfg, chunks, client, maxAttempts, retryPolicy, db, insertStmt,
-        state)
+        artifactId, state)
     elif nextRetryMs == 0 and state.inFlightCount == maxInFlight:
       waitForSingleResult(cfg, chunks, client, maxAttempts, retryPolicy, db, insertStmt,
-        state)
+        artifactId, state)
     elif nextRetryMs > 0:
       sleep(min(RetryPollSliceMs, nextRetryMs))
 
 proc runPipeline*(cfg: RuntimeConfig; chunks: seq[InputChunk]; client: Relay;
-    db: DbConn; insertStmt: SqlPrepared): tuple[
+    db: DbConn; insertStmt: SqlPrepared; artifactId: int64): tuple[
       allSucceeded: bool, wroteRows: bool] =
   let total = chunks.len
   let maxInFlight = max(1, cfg.networkConfig.maxInflight)
@@ -190,10 +192,10 @@ proc runPipeline*(cfg: RuntimeConfig; chunks: seq[InputChunk]; client: Relay;
     submitFreshAttempts(cfg, chunks, maxInFlight, state)
     startBatchIfAny(client, state)
     let drained = drainReadyResults(cfg, chunks, client, maxAttempts, retryPolicy, db,
-      insertStmt, state)
+      insertStmt, artifactId, state)
 
     if state.remaining > 0 and not drained:
       waitForProgress(cfg, chunks, client, maxInFlight, maxAttempts, retryPolicy, db,
-        insertStmt, state)
+        insertStmt, artifactId, state)
 
   result = (allSucceeded: state.allSucceeded, wroteRows: state.wroteRows)
