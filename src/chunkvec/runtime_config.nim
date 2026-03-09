@@ -26,13 +26,13 @@ type
 
 const HelpText = """
 Usage:
-  cvstore [--source=RELATIVEPATH] INPUT.txt DB.sqlite
-  cvquery [--doc=DOC] [--kind=source|derived] [--position=N] [--label=TEXT] QUERY.txt DB.sqlite
+  cvstore --doc=DOC --kind=source|derived [--source=RELATIVEPATH] INPUT.txt DB.sqlite
+  cvquery [--doc=DOC] [--kind=source|derived] [--position=N] [--label=TEXT] QUERY DB.sqlite
 
 Options:
+  --doc=DOC        Ingest doc id for cvstore; exact-match doc filter for cvquery.
+  --kind=KIND      Ingest kind for cvstore; exact-match kind filter for cvquery.
   --source=PATH    Optional stored chunk source for cvstore.
-  --doc=DOC        Exact-match query filter for logical document id.
-  --kind=KIND      Exact-match query filter for source or derived.
   --position=N     Exact-match query filter for integer position.
   --label=TEXT     Substring query filter for chunk label.
   --help, -h       Show this help and exit.
@@ -122,9 +122,10 @@ proc parseCliArgs(cliArgs: seq[string]): CliArgs =
       elif key == "kind":
         if val.len == 0:
           cliError("missing value for --kind")
-        result.searchFilters.kind = parseChunkKind(val)
-        if result.searchFilters.kind == none:
+        let parsedKind = parseChunkKind(val)
+        if parsedKind == none:
           cliError("invalid value for --kind: " & val)
+        result.searchFilters.kind = parsedKind
       elif key == "position":
         if val.len == 0:
           cliError("missing value for --position")
@@ -144,7 +145,7 @@ proc parseCliArgs(cliArgs: seq[string]): CliArgs =
       discard
 
   if result.inputPath.len == 0:
-    cliError("missing required INPUT.txt argument")
+    cliError("missing required INPUT.txt/QUERY argument")
   if result.dbPath.len == 0:
     cliError("missing required DB.sqlite argument")
 

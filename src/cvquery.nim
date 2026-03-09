@@ -32,21 +32,15 @@ proc runSearchApp*(): int =
     if cfg.openaiConfig.apiKey.len == 0:
       raise newException(ValueError,
         "missing API key; set DEEPINFRA_API_KEY or api_key in config.json")
-    if not fileExists(cfg.inputPath):
-      raise newException(ValueError, "input file does not exist: " & cfg.inputPath)
     if not fileExists(cfg.dbPath):
       raise newException(ValueError, "database does not exist: " & cfg.dbPath)
-
-    let queryText = readFile(cfg.inputPath).strip()
-    if queryText.len == 0:
-      raise newException(ValueError, "query text must be provided in input file")
 
     client = newRelay(
       maxInFlight = 1,
       defaultTimeoutMs = cfg.networkConfig.totalTimeoutMs
     )
 
-    let queryVector = requestEmbeddingWithRetry(client, cfg, queryText)
+    let queryVector = requestEmbeddingWithRetry(client, cfg, cfg.inputPath)
 
     db = openDatabase(cfg.dbPath)
     dbOpened = true

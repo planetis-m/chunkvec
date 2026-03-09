@@ -22,8 +22,13 @@ proc runIngestApp*(): int =
         "missing API key; set DEEPINFRA_API_KEY or api_key in config.json")
     if not fileExists(cfg.inputPath):
       raise newException(ValueError, "input file does not exist: " & cfg.inputPath)
+    if cfg.searchFilters.docId.len == 0:
+      raise newException(ValueError, "missing required --doc")
+    if cfg.searchFilters.kind == none:
+      raise newException(ValueError, "missing required --kind")
 
-    let chunks = loadInputChunks(cfg.inputPath, cfg.sourcePath)
+    let chunks = loadInputChunks(cfg.inputPath, cfg.sourcePath, cfg.searchFilters.docId,
+      cfg.searchFilters.kind)
     if chunks.len == 0:
       raise newException(ValueError, "input did not produce any non-empty chunks")
 
