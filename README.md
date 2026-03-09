@@ -11,9 +11,10 @@ queries locally from that database.
 
 - input is one marked-up text file, output is one SQLite database
 - chunk order is preserved with explicit `ordinal` values
-- doc, kind, position, and optional label metadata stay attached to each stored row
+- `cvstore` applies one `doc` and one `kind` to the whole ingest run
+- each chunk still carries its own `pos` and optional `label`
 - ingest does bounded in-flight embedding work with retry handling
-- search does one embedding request for the query, then nearest-neighbor lookup
+- search embeds one raw `QUERY` string, then does nearest-neighbor lookup
   locally through `sqlite-vector`
 
 ## Design
@@ -23,18 +24,19 @@ queries locally from that database.
 1. `cvstore`:
 - reads one input text file
 - parses required leading `<chunk ...>` markers
+- requires `--doc` and `--kind` and stores those values on every inserted row
 - sends embedding requests with bounded in-flight work and retries
 - inserts successful chunks into SQLite in original order
 - initializes and quantizes the `sqlite-vector` column
 
 2. `cvquery`:
-- reads one query text file
+- takes one raw `QUERY` positional argument
 - optionally applies CLI filter flags such as `--doc` and `--kind`
 - embeds that query through the same built-in model
 - prints top matches from the local SQLite database
 
 The public contract is intentionally small: one marked-up text file in, one
-SQLite database out, then local search from one query file.
+SQLite database out, then local search from one query string.
 
 ## Installation
 
@@ -138,42 +140,45 @@ Built-in defaults:
 ## CLI
 
 ```bash
-./cvstore [--source=RELATIVEPATH] INPUT.txt DB.sqlite
-./cvquery [--doc=DOC] [--kind=source|derived] [--position=N] [--label=TEXT] QUERY.txt DB.sqlite
+./cvstore --doc=DOC --kind=source|derived [--source=RELATIVEPATH] INPUT.txt DB.sqlite
+./cvquery [--doc=DOC] [--kind=source|derived] [--position=N] [--label=TEXT] QUERY DB.sqlite
 ./cvstore --help
 ./cvquery --help
 ```
 
-- `cvstore` takes `[--source=RELATIVEPATH] INPUT.txt DB.sqlite`
-- `cvquery` takes `[--doc=DOC] [--kind=source|derived] [--position=N] [--label=TEXT] QUERY.txt DB.sqlite`
+- `cvstore` requires `--doc` and `--kind` for the whole ingest run
+- `cvquery` takes a raw `QUERY` string, not a query file
 - `stdout` is used only for search results
 - logs and fatal errors go to `stderr`
 
 ## Input format
 
 `cvstore` requires every chunk to start with a `<chunk ...>` marker.
-Existing `<page ...>` inputs and databases must be regenerated for this format.
+Chunk headers now carry only per-chunk metadata. `doc` and `kind` no longer
+belong in the input file; pass them on the `cvstore` command line instead.
+Existing `<page ...>` inputs and older `<chunk doc=... kind=... position=...>`
+files must be regenerated for this format.
 
 Minimal example:
 
 ```text
-<chunk doc="sample-book" kind=source position=1>
+<chunk pos=1>
 First chunk.
 
-<chunk doc="sample-book" kind=source position=2>
+<chunk pos=2>
 Second chunk.
 
-<chunk doc="sample-book" kind=source position=3>
+<chunk pos=3>
 Third chunk.
 ```
 
 Input with label metadata:
 
 ```text
-<chunk doc="ml-book" kind=source position=12 label="Backpropagation">
+<chunk pos=12 label="Backpropagation">
 Gradient descent updates weights using the negative gradient.
 
-<chunk doc="ml-book" kind=source position=13 label="Regularization">
+<chunk pos=13 label="Regularization">
 Dropout disables random activations during training.
 ```
 
@@ -181,10 +186,9 @@ Rules:
 
 - leading file whitespace before the first marker is ignored
 - every chunk must start with `<chunk ...>`
-- `doc` is required and must be a non-empty double-quoted string
-- `kind` is required and must be one of `source`, `derived`
-- `position` is required and must be an integer
+- `pos` is required and must be an integer
 - `label` is optional and must be double-quoted when present
+- `doc`, `kind`, and legacy `position` attributes are rejected
 - unknown marker attributes are rejected
 - surrounding whitespace around each chunk body is trimmed
 - empty chunk bodies are rejected
@@ -194,21 +198,20 @@ Rules:
 Prepare an input file:
 
 ```text
-<chunk doc="notes-course" kind=source position=4 label="Embeddings">
+<chunk pos=4 label="Embeddings">
 Embeddings map text into vectors where similar meanings stay close.
 
-<chunk doc="notes-course" kind=source position=5 label="Vector Search">
+<chunk pos=5 label="Vector Search">
 Nearest-neighbor search compares a query vector against stored vectors.
 
-<chunk doc="notes-course" kind=derived position=6>
+<chunk pos=6>
 Use cosine distance when direction matters more than magnitude.
 ```
 
-Prepare a query:
+Set the ingest metadata on `cvstore`:
 
-```text
-How do embeddings help search?
-```
+- `--doc=notes-course`
+- `--kind=source`
 
 Set your API key:
 
@@ -219,16 +222,14 @@ export DEEPINFRA_API_KEY=...
 Ingest:
 
 ```bash
-./cvstore --source=course/notes.md notes.txt notes.sqlite
+./cvstore --doc=notes-course --kind=source --source=course/notes.md notes.txt notes.sqlite
 ```
 
 Search:
 
 ```bash
-./cvquery --doc=notes-course --kind=source --position=5 --label=vector_search query.txt notes.sqlite
+./cvquery --doc=notes-course --kind=source --position=5 --label=vector_search "How do embeddings help search?" notes.sqlite
 ```
-
-`cvquery` reads a plain query file containing only the semantic query text.
 
 Search filter rules:
 
@@ -238,7 +239,7 @@ Search filter rules:
 - `label` is a substring filter after `strutils.normalize` on both sides
 - `strutils.normalize` lowercases ASCII and removes `_`
 - if multiple CLI filters are present, all must match
-- query text is still required even when filters are present
+- `QUERY` is still required even when filters are present
 
 Typical output:
 
@@ -261,7 +262,7 @@ Nearest-neighbor search compares a query vector against stored vectors.
 
 - DeepInfra API key via `DEEPINFRA_API_KEY` or `config.json`
 - one marked-up input text file for ingest
-- one query text file for search
+- one raw query string for search
 - `vector.so`, `vector.dylib`, or `vector.dll` beside the executables
 - if building from source: Nim `>= 2.2.8`, Atlas, `libcurl`, and SQLite
 
