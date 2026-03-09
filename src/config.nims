@@ -13,7 +13,7 @@ when not defined(windows):
 when defined(linux):
   # sqlite extensions are loaded into this process and may rely on libm symbols
   # such as `fmaxf`.
-  switch("passL", "-lm")
+  switch("passL", "-Wl,--no-as-needed -lm -Wl,--as-needed")
 
 when defined(macosx):
   switch("passC", "-I" & staticExec("brew --prefix curl") & "/include")
