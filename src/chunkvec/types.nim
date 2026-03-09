@@ -42,10 +42,10 @@ type
     sqliteConfig*: SqliteConfig
 
   InputChunk* = object
-    source*: string
     ordinal*: int
     text*: string
-    metadata*: ChunkMetadata
+    position*: int
+    label*: string
 
   ChunkRecord* = object
     chunk*: InputChunk

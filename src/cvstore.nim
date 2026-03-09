@@ -27,13 +27,15 @@ proc runIngestApp*(): int =
     if cfg.searchFilters.kind == none:
       raise newException(ValueError, "missing required --kind")
 
-    let chunks = loadInputChunks(cfg.inputPath, cfg.sourcePath, cfg.searchFilters.docId,
-      cfg.searchFilters.kind)
+    let chunks = loadInputChunks(cfg.inputPath)
     if chunks.len == 0:
       raise newException(ValueError, "input did not produce any non-empty chunks")
 
+    let sourceName =
+      if cfg.sourcePath.len > 0: cfg.sourcePath
+      else: cfg.inputPath
     logInfo("starting embedding pipeline for " & $chunks.len & " chunk(s) from " &
-      chunks[0].source & ", please wait...")
+      sourceName & ", please wait...")
 
     db = openDatabase(cfg.dbPath)
     dbOpened = true

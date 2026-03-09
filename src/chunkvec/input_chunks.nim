@@ -28,8 +28,8 @@ proc parseQuotedValue(text: string; value: var string; start: int): int =
   result = pos - start
 
 proc parseChunkMarkerHeader(text, markerName: string; startPos: int;
-    metadata: var ChunkMetadata; parseAttr:
-    proc(text, attrName: string; pos: var int; metadata: var ChunkMetadata) {.nimcall.}): int =
+    chunk: var InputChunk; parseAttr:
+    proc(text, attrName: string; pos: var int; chunk: var InputChunk) {.nimcall.}): int =
   var pos = startPos
   if pos >= text.len or text[pos] != '<':
     return 0
@@ -63,18 +63,18 @@ proc parseChunkMarkerHeader(text, markerName: string; startPos: int;
 
     inc pos
     skipMarkerWhitespace(text, pos)
-    parseAttr(text, attrName, pos, metadata)
+    parseAttr(text, attrName, pos, chunk)
 
 proc parseChunkMetadataAttr(text, attrName: string; pos: var int;
-    metadata: var ChunkMetadata) {.nimcall.} =
+    chunk: var InputChunk) {.nimcall.} =
   case attrName
   of "pos":
-    let parsed = parseInt(text, metadata.position, pos)
+    let parsed = parseInt(text, chunk.position, pos)
     if parsed == 0:
       failParse("pos must be an integer")
     pos.inc(parsed)
   of "label":
-    let parsed = parseQuotedValue(text, metadata.label, pos)
+    let parsed = parseQuotedValue(text, chunk.label, pos)
     if parsed == 0:
       failParse("label must use a double-quoted string")
     pos.inc(parsed)
@@ -118,24 +118,23 @@ proc trimChunkBounds(text: string; startPos, endPos: int): Slice[int] =
 
   result = first ..< last
 
-proc parseChunkMarker(text: string; docId: string; kind: ChunkKind;
-    metadata: var ChunkMetadata; startPos: int): int =
-  metadata = ChunkMetadata(
-    docId: docId,
-    kind: kind,
+proc parseChunkMarker(text: string; chunk: var InputChunk; startPos: int): int =
+  chunk = InputChunk(
+    ordinal: 0,
+    text: "",
     position: NoPositionFilter,
     label: ""
   )
 
-  let parsedLen = parseChunkMarkerHeader(text, ChunkMarkerName, startPos, metadata,
+  let parsedLen = parseChunkMarkerHeader(text, ChunkMarkerName, startPos, chunk,
     parseChunkMetadataAttr)
   if parsedLen == 0:
     return 0
-  if metadata.position == NoPositionFilter:
+  if chunk.position == NoPositionFilter:
     failParse("missing required pos attribute")
   result = parsedLen
 
-proc parseInputChunks*(source, text, docId: string; kind: ChunkKind): seq[InputChunk] =
+proc parseInputChunks*(text: string): seq[InputChunk] =
   var pos = skipWhitespace(text)
   var ordinal = 1
 
@@ -143,8 +142,8 @@ proc parseInputChunks*(source, text, docId: string; kind: ChunkKind): seq[InputC
     if not markerAtLineStart(text, pos, ChunkMarkerPrefix):
       failParse("missing <chunk ...> marker")
 
-    var metadata: ChunkMetadata
-    let markerLen = parseChunkMarker(text, docId, kind, metadata, pos)
+    var chunk: InputChunk
+    let markerLen = parseChunkMarker(text, chunk, pos)
     if markerLen == 0:
       failParse("expected <chunk ...> marker")
 
@@ -154,15 +153,12 @@ proc parseInputChunks*(source, text, docId: string; kind: ChunkKind): seq[InputC
     if bodyBounds.a >= bodyBounds.b:
       failParse("chunk body is empty")
 
-    result.add(InputChunk(
-      source: source,
-      ordinal: ordinal,
-      text: text[bodyBounds],
-      metadata: metadata
-    ))
+    chunk.ordinal = ordinal
+    chunk.text = text[bodyBounds]
+    result.add(chunk)
 
     pos = nextMarkerPos
     inc ordinal
 
-proc loadInputChunks*(path, sourcePath, docId: string; kind: ChunkKind): seq[InputChunk] =
-  result = parseInputChunks(sourcePath, readFile(path), docId, kind)
+proc loadInputChunks*(path: string): seq[InputChunk] =
+  result = parseInputChunks(readFile(path))

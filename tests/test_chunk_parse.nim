@@ -2,98 +2,73 @@ import std/os
 import ../src/chunkvec/[input_chunks, types]
 
 proc testPageMarkerChunk() =
-  let chunks = parseInputChunks("slides.md",
-    """<chunk pos=12 label="Intro">
+  let chunks = parseInputChunks("""<chunk pos=12 label="Intro">
 Hello
-world""", "ml-unit-1", source)
+world""")
   doAssert chunks.len == 1
-  doAssert chunks[0].source == "slides.md"
   doAssert chunks[0].ordinal == 1
-  doAssert chunks[0].metadata == ChunkMetadata(
-    docId: "ml-unit-1",
-    kind: source,
-    position: 12,
-    label: "Intro"
-  )
+  doAssert chunks[0].position == 12
+  doAssert chunks[0].label == "Intro"
   doAssert chunks[0].text == "Hello\nworld"
 
 proc testMultipleChunks() =
-  let chunks = parseInputChunks("slides.md",
-    """<chunk label="Intro" pos=12>
+  let chunks = parseInputChunks("""<chunk label="Intro" pos=12>
 Hello
 
 <chunk pos=13>
-World""", "ml-unit-1", derived)
+World""")
   doAssert chunks.len == 2
-  doAssert chunks[0].metadata == ChunkMetadata(
-    docId: "ml-unit-1",
-    kind: derived,
-    position: 12,
-    label: "Intro"
-  )
+  doAssert chunks[0].position == 12
+  doAssert chunks[0].label == "Intro"
   doAssert chunks[0].text == "Hello"
-  doAssert chunks[1].metadata == ChunkMetadata(
-    docId: "ml-unit-1",
-    kind: derived,
-    position: 13,
-    label: ""
-  )
+  doAssert chunks[1].position == 13
+  doAssert chunks[1].label.len == 0
   doAssert chunks[1].text == "World"
 
 proc testRejectUnknownAttribute() =
   doAssertRaises(ValueError):
-    discard parseInputChunks("slides.md", """<chunk pos=12 title="Intro">
-Hello""", "ml-unit-1", source)
+    discard parseInputChunks("""<chunk pos=12 title="Intro">
+Hello""")
 
 proc testRejectMissingMarker() =
   doAssertRaises(ValueError):
-    discard parseInputChunks("notes.txt", "just text", "ml-unit-1", source)
+    discard parseInputChunks("just text")
 
 proc testRejectInlineDoc() =
   doAssertRaises(ValueError):
-    discard parseInputChunks("slides.md", """<chunk doc="ml-unit-1" pos=12>
-Hello""", "ignored-doc", source)
+    discard parseInputChunks("""<chunk doc="ml-unit-1" pos=12>
+Hello""")
 
 proc testRejectInlineKind() =
   doAssertRaises(ValueError):
-    discard parseInputChunks("slides.md",
+    discard parseInputChunks(
       """<chunk kind=derived pos=12>
-Hello""", "ml-unit-1", source)
+Hello""")
 
 proc testRejectMissingRequiredPosition() =
   doAssertRaises(ValueError):
-    discard parseInputChunks("slides.md", """<chunk label="Intro">
-Hello""", "ml-unit-1", source)
+    discard parseInputChunks("""<chunk label="Intro">
+Hello""")
 
 proc testRejectEmptyChunkBody() =
   doAssertRaises(ValueError):
-    discard parseInputChunks("slides.md",
-      "<chunk pos=1>\n\n", "ml-unit-1", source)
+    discard parseInputChunks("<chunk pos=1>\n\n")
 
-proc testLoadInputChunksUsesSourcePath() =
+proc testLoadInputChunks() =
   let path = "tests/test_chunk_parse_input.txt"
   writeFile(path, """<chunk pos=1 label="Intro">
 Hello""")
   defer:
     removeFile(path)
-  let chunks = loadInputChunks(path, "course/week-1-notes.md", "ml-unit-1", source)
+  let chunks = loadInputChunks(path)
   doAssert chunks.len == 1
-  doAssert chunks[0].source == "course/week-1-notes.md"
-
-proc testLoadInputChunksKeepsEmptySourcePath() =
-  let path = "tests/test_chunk_parse_input.txt"
-  writeFile(path, """<chunk pos=1 label="Intro">
-Hello""")
-  defer:
-    removeFile(path)
-  let chunks = loadInputChunks(path, "", "ml-unit-1", source)
-  doAssert chunks.len == 1
-  doAssert chunks[0].source.len == 0
+  doAssert chunks[0].position == 1
+  doAssert chunks[0].label == "Intro"
 
 proc testRejectLegacyPositionAttr() =
   doAssertRaises(ValueError):
-    discard parseInputChunks("slides.md", """<chunk position=12>
-Hello""", "ml-unit-1", source)
+    discard parseInputChunks("""<chunk position=12>
+Hello""")
 
 when isMainModule:
   testPageMarkerChunk()
@@ -105,5 +80,4 @@ when isMainModule:
   testRejectMissingRequiredPosition()
   testRejectLegacyPositionAttr()
   testRejectEmptyChunkBody()
-  testLoadInputChunksUsesSourcePath()
-  testLoadInputChunksKeepsEmptySourcePath()
+  testLoadInputChunks()

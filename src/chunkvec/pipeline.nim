@@ -32,17 +32,17 @@ proc initPipelineState(total: int): PipelineState =
   )
 
 proc insertRecord(db: DbConn; insertStmt: SqlPrepared; record: sink ChunkRecord;
-    state: var PipelineState) =
+    cfg: RuntimeConfig; state: var PipelineState) =
   db.exec(
     insertStmt,
-    record.chunk.source,
+    cfg.sourcePath,
     record.chunk.ordinal,
     record.chunk.text,
     record.embedding,
-    record.chunk.metadata.docId,
-    $record.chunk.metadata.kind,
-    record.chunk.metadata.position,
-    record.chunk.metadata.label
+    cfg.searchFilters.docId,
+    $cfg.searchFilters.kind,
+    record.chunk.position,
+    record.chunk.label
   )
   state.wroteRows = true
 
@@ -111,7 +111,7 @@ proc processEmbeddingSuccess(cfg: RuntimeConfig; chunks: seq[InputChunk]; seqId:
         chunk: chunks[seqId],
         embedding: move embedding(parsed)
       )
-      db.insertRecord(insertStmt, record, state)
+      db.insertRecord(insertStmt, record, cfg, state)
       state.finalizeChunk(succeeded = true)
 
 proc processResult(cfg: RuntimeConfig; chunks: seq[InputChunk]; item: RequestResult;
