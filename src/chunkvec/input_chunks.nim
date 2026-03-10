@@ -68,10 +68,10 @@ proc parseChunkMarkerHeader(text, markerName: string; startPos: int;
 proc parseChunkMetadataAttr(text, attrName: string; pos: var int;
     chunk: var InputChunk) {.nimcall.} =
   case attrName
-  of "pos":
-    let parsed = parseInt(text, chunk.position, pos)
+  of "page":
+    let parsed = parseInt(text, chunk.page, pos)
     if parsed == 0:
-      failParse("pos must be an integer")
+      failParse("page must be an integer")
     pos.inc(parsed)
   of "label":
     let parsed = parseQuotedValue(text, chunk.label, pos)
@@ -122,7 +122,7 @@ proc parseChunkMarker(text: string; chunk: var InputChunk; startPos: int): int =
   chunk = InputChunk(
     ordinal: 0,
     text: "",
-    position: NoPositionFilter,
+    page: NoPageFilter,
     label: ""
   )
 
@@ -130,8 +130,6 @@ proc parseChunkMarker(text: string; chunk: var InputChunk; startPos: int): int =
     parseChunkMetadataAttr)
   if parsedLen == 0:
     return 0
-  if chunk.position == NoPositionFilter:
-    failParse("missing required pos attribute")
   result = parsedLen
 
 proc parseInputChunks*(text: string): seq[InputChunk] =

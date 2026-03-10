@@ -19,7 +19,7 @@ proc testParseQueryFilters() =
   let cfg = buildRuntimeConfig(@[
     "--doc=chapter1-source",
     "--kind=source",
-    "--position=12",
+    "--page=12",
     "--label=regularization",
     "query.txt",
     "db.sqlite"
@@ -29,7 +29,7 @@ proc testParseQueryFilters() =
   doAssert cfg.searchFilters == SearchFilters(
     docId: "chapter1-source",
     kind: source,
-    position: 12,
+    page: 12,
     labelSubstring: "regularization"
   )
 
@@ -46,7 +46,7 @@ proc testParseStoreWithoutSourcePath() =
   doAssert cfg.searchFilters == SearchFilters(
     docId: "chapter1-notes",
     kind: derived,
-    position: NoPositionFilter,
+    page: NoPageFilter,
     labelSubstring: ""
   )
 

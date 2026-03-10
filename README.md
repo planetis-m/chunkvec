@@ -12,7 +12,7 @@ queries locally from that database.
 - input is one marked-up text file, output is one SQLite database
 - chunk order is preserved with explicit `ordinal` values
 - `cvstore` applies one `doc` and one `kind` to the whole ingest run
-- each chunk still carries its own `pos` and optional `label`
+- each chunk still carries its own optional `page` and optional `label`
 - ingest does bounded in-flight embedding work with retry handling
 - search embeds one raw `QUERY` string, then does nearest-neighbor lookup
   locally through `sqlite-vector`
@@ -141,7 +141,7 @@ Built-in defaults:
 
 ```bash
 ./cvstore --doc=DOC --kind=source|derived [--source=RELATIVEPATH] INPUT.txt DB.sqlite
-./cvquery [--doc=DOC] [--kind=source|derived] [--position=N] [--label=TEXT] QUERY DB.sqlite
+./cvquery [--doc=DOC] [--kind=source|derived] [--page=N] [--label=TEXT] QUERY DB.sqlite
 ./cvstore --help
 ./cvquery --help
 ```
@@ -156,29 +156,29 @@ Built-in defaults:
 `cvstore` requires every chunk to start with a `<chunk ...>` marker.
 Chunk headers now carry only per-chunk metadata. `doc` and `kind` no longer
 belong in the input file; pass them on the `cvstore` command line instead.
-Existing `<page ...>` inputs and older `<chunk doc=... kind=... position=...>`
-files must be regenerated for this format.
+Older `<chunk ... pos=...>` and `<chunk doc=... kind=... position=...>` files
+must be regenerated for this format.
 
 Minimal example:
 
 ```text
-<chunk pos=1>
+<chunk page=1>
 First chunk.
 
-<chunk pos=2>
+<chunk page=2>
 Second chunk.
 
-<chunk pos=3>
+<chunk page=3>
 Third chunk.
 ```
 
 Input with label metadata:
 
 ```text
-<chunk pos=12 label="Backpropagation">
+<chunk page=12 label="Backpropagation">
 Gradient descent updates weights using the negative gradient.
 
-<chunk pos=13 label="Regularization">
+<chunk page=13 label="Regularization">
 Dropout disables random activations during training.
 ```
 
@@ -186,9 +186,9 @@ Rules:
 
 - leading file whitespace before the first marker is ignored
 - every chunk must start with `<chunk ...>`
-- `pos` is required and must be an integer
+- `page` is optional and must be an integer when present
 - `label` is optional and must be double-quoted when present
-- `doc`, `kind`, and legacy `position` attributes are rejected
+- `doc`, `kind`, and legacy `pos`/`position` attributes are rejected
 - unknown marker attributes are rejected
 - surrounding whitespace around each chunk body is trimmed
 - empty chunk bodies are rejected
@@ -198,13 +198,13 @@ Rules:
 Prepare an input file:
 
 ```text
-<chunk pos=4 label="Embeddings">
+<chunk page=4 label="Embeddings">
 Embeddings map text into vectors where similar meanings stay close.
 
-<chunk pos=5 label="Vector Search">
+<chunk page=5 label="Vector Search">
 Nearest-neighbor search compares a query vector against stored vectors.
 
-<chunk pos=6>
+<chunk>
 Use cosine distance when direction matters more than magnitude.
 ```
 
@@ -228,14 +228,14 @@ Ingest:
 Search:
 
 ```bash
-./cvquery --doc=notes-course --kind=source --position=5 --label=vector_search "How do embeddings help search?" notes.sqlite
+./cvquery --doc=notes-course --kind=source --page=5 --label=vector_search "How do embeddings help search?" notes.sqlite
 ```
 
 Search filter rules:
 
 - `doc` is an exact match filter on the logical document id
 - `kind` is an exact match filter on `source` or `derived`
-- `position` is an exact integer filter
+- `page` is an exact integer filter
 - `label` is a substring filter after `strutils.normalize` on both sides
 - `strutils.normalize` lowercases ASCII and removes `_`
 - if multiple CLI filters are present, all must match
@@ -244,10 +244,10 @@ Search filter rules:
 Typical output:
 
 ```text
-1. distance=0.123456 source=course/notes.md ordinal=1 doc="notes-course" kind=source position=4 label="Embeddings"
+1. distance=0.123456 source=course/notes.md ordinal=1 doc="notes-course" kind=source page=4 label="Embeddings"
 Embeddings map text into vectors where similar meanings stay close.
 
-2. distance=0.187654 source=course/notes.md ordinal=2 doc="notes-course" kind=source position=5 label="Vector Search"
+2. distance=0.187654 source=course/notes.md ordinal=2 doc="notes-course" kind=source page=5 label="Vector Search"
 Nearest-neighbor search compares a query vector against stored vectors.
 ```
 

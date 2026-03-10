@@ -27,13 +27,13 @@ type
 const HelpText = """
 Usage:
   cvstore --doc=DOC --kind=source|derived [--source=RELATIVEPATH] INPUT.txt DB.sqlite
-  cvquery [--doc=DOC] [--kind=source|derived] [--position=N] [--label=TEXT] QUERY DB.sqlite
+  cvquery [--doc=DOC] [--kind=source|derived] [--page=N] [--label=TEXT] QUERY DB.sqlite
 
 Options:
   --doc=DOC        Ingest doc id for cvstore; exact-match doc filter for cvquery.
   --kind=KIND      Ingest kind for cvstore; exact-match kind filter for cvquery.
   --source=PATH    Optional stored chunk source for cvstore.
-  --position=N     Exact-match query filter for integer position.
+  --page=N         Exact-match query filter for integer page.
   --label=TEXT     Substring query filter for chunk label.
   --help, -h       Show this help and exit.
 """
@@ -84,11 +84,11 @@ template ifNonNegative(value, fallback: untyped): untyped =
   if value >= 0: value
   else: fallback
 
-proc parseSearchFilterPosition(val: string): int =
+proc parseSearchFilterPage(val: string): int =
   try:
     result = parseInt(val)
   except ValueError:
-    cliError("invalid value for --position: " & val)
+    cliError("invalid value for --page: " & val)
 
 proc parseCliArgs(cliArgs: seq[string]): CliArgs =
   result = CliArgs(
@@ -126,10 +126,10 @@ proc parseCliArgs(cliArgs: seq[string]): CliArgs =
         if parsedKind == none:
           cliError("invalid value for --kind: " & val)
         result.searchFilters.kind = parsedKind
-      elif key == "position":
+      elif key == "page":
         if val.len == 0:
-          cliError("missing value for --position")
-        result.searchFilters.position = parseSearchFilterPosition(val)
+          cliError("missing value for --page")
+        result.searchFilters.page = parseSearchFilterPage(val)
       elif key == "label":
         if val.len == 0:
           cliError("missing value for --label")

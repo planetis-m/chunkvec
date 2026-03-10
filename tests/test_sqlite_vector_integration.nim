@@ -68,7 +68,7 @@ proc testSqliteVectorRoundTrip() =
   doAssert rows[0].metadata == ChunkMetadata(
     docId: "ml-unit-1",
     kind: source,
-    position: 7,
+    page: 7,
     label: "Intro_Basics"
   )
 
@@ -93,7 +93,7 @@ proc testSqliteVectorRoundTrip() =
     SearchFilters(
       docId: "ml-unit-2",
       kind: derived,
-      position: 7,
+      page: 7,
       labelSubstring: "deep intro"
     ))
   doAssert combinedRows.len == 1

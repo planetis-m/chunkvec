@@ -67,7 +67,7 @@ proc initSchema*(db: DbConn) =
   """ & EmbeddingColumn & """ BLOB NOT NULL,
   doc_id TEXT NOT NULL,
   kind TEXT NOT NULL CHECK (kind IN ('source', 'derived')),
-  position INTEGER NOT NULL,
+  page INTEGER,
   label TEXT NOT NULL,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );"""
@@ -77,8 +77,8 @@ proc initSchema*(db: DbConn) =
   ON """ & TableName & """(source, ordinal);"""
   ))
   db.exec(sql(
-    """CREATE INDEX IF NOT EXISTS idx_chunks_doc_kind_position
-  ON """ & TableName & """(doc_id, kind, position);"""
+    """CREATE INDEX IF NOT EXISTS idx_chunks_doc_kind_page
+  ON """ & TableName & """(doc_id, kind, page);"""
   ))
 
 proc beginTransaction*(db: DbConn) =
@@ -106,7 +106,7 @@ proc prepareInsertStatement*(db: DbConn): SqlPrepared =
   """ & EmbeddingColumn & """,
   doc_id,
   kind,
-  position,
+  page,
   label
 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
 """
@@ -121,6 +121,9 @@ proc rowCount*(db: DbConn): int =
   result = parseInt(db.getValue(sql("SELECT COUNT(*) FROM " & TableName & ";")))
 
 proc readSearchResult(row: InstantRow): SearchResult =
+  let page =
+    if sqlite3.column_type(row, 7) == SQLITE_NULL: NoPageFilter
+    else: sqlite3.column_int(row, 7).int
   result = SearchResult(
     id: sqlite3.column_int64(row, 0),
     distance: sqlite3.column_double(row, 1).float,
@@ -130,7 +133,7 @@ proc readSearchResult(row: InstantRow): SearchResult =
     metadata: ChunkMetadata(
       docId: row.textColumn(5),
       kind: parseChunkKind(row.textColumn(6)),
-      position: sqlite3.column_int(row, 7).int,
+      page: page,
       label: row.textColumn(8)
     )
   )
@@ -145,7 +148,7 @@ proc runTopKSearch(db: DbConn; queryVector: seq[float32]; topK: int): seq[Search
   c.text,
   c.doc_id,
   c.kind,
-  c.position,
+  c.page,
   c.label
 FROM """ & TableName & """ AS c
 JOIN vector_quantize_scan('""" & TableName & """', '""" &
@@ -187,7 +190,7 @@ proc runFilteredSearch(db: DbConn; queryVector: seq[float32]; filters: SearchFil
   c.text,
   c.doc_id,
   c.kind,
-  c.position,
+  c.page,
   c.label
 FROM """ & TableName & """ AS c
 JOIN vector_quantize_scan('""" & TableName & """', '""" &
@@ -202,9 +205,9 @@ JOIN vector_quantize_scan('""" & TableName & """', '""" &
   if filters.kind != none:
     addWherePrefix()
     query.add("c.kind = ?\n")
-  if filters.position != NoPositionFilter:
+  if filters.page != NoPageFilter:
     addWherePrefix()
-    query.add("c.position = ?\n")
+    query.add("c.page = ?\n")
   if filters.labelSubstring.len > 0:
     addWherePrefix()
     query.add("instr(" & normalizedLabelExpr("c.label") & ", ?) > 0\n")
@@ -226,8 +229,8 @@ JOIN vector_quantize_scan('""" & TableName & """', '""" &
     if filters.kind != none:
       stmt.bindParam(paramIdx, $filters.kind)
       inc paramIdx
-    if filters.position != NoPositionFilter:
-      stmt.bindParam(paramIdx, filters.position)
+    if filters.page != NoPageFilter:
+      stmt.bindParam(paramIdx, filters.page)
       inc paramIdx
     if filters.labelSubstring.len > 0:
       stmt.bindParam(paramIdx, normalizedLabel)

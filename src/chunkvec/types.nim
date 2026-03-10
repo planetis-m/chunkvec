@@ -1,7 +1,7 @@
 import openai/core
 
 const
-  NoPositionFilter* = -1
+  NoPageFilter* = -1
 
 type
   ChunkKind* = enum
@@ -12,13 +12,13 @@ type
   ChunkMetadata* = object
     docId*: string
     kind*: ChunkKind
-    position*: int
+    page*: int
     label*: string
 
   SearchFilters* = object
     docId*: string
     kind*: ChunkKind
-    position*: int = NoPositionFilter
+    page*: int = NoPageFilter
     labelSubstring*: string
 
   NetworkConfig* = object
@@ -44,7 +44,7 @@ type
   InputChunk* = object
     ordinal*: int
     text*: string
-    position*: int
+    page*: int
     label*: string
 
   ChunkRecord* = object
@@ -78,4 +78,4 @@ proc parseChunkKind*(text: string): ChunkKind {.inline.} =
 
 proc hasFilters*(filters: SearchFilters): bool {.inline.} =
   result = filters.docId.len > 0 or filters.kind != none or
-    filters.position != NoPositionFilter or filters.labelSubstring.len > 0
+    filters.page != NoPageFilter or filters.labelSubstring.len > 0

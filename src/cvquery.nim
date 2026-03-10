@@ -12,8 +12,9 @@ proc renderResult(row: SearchResult; rank: int) =
   var header = $rank & ". distance=" & formatFloat(row.distance, ffDecimal, 6) &
     " ordinal=" & $row.ordinal &
     " doc=\"" & row.metadata.docId & "\"" &
-    " kind=" & $row.metadata.kind &
-    " position=" & $row.metadata.position
+    " kind=" & $row.metadata.kind
+  if row.metadata.page != NoPageFilter:
+    header.add " page=" & $row.metadata.page
   if row.source.len > 0:
     header.add " source=" & row.source
   if row.metadata.label.len > 0:
