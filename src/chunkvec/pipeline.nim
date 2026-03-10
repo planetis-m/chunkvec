@@ -41,7 +41,7 @@ proc insertRecord(db: DbConn; insertStmt: SqlPrepared; record: sink ChunkRecord;
     record.embedding,
     cfg.searchFilters.docId,
     $cfg.searchFilters.kind,
-    if record.chunk.page == NoPageFilter: nil else: record.chunk.page,
+    record.chunk.page,
     record.chunk.label
   )
   state.wroteRows = true

@@ -67,7 +67,7 @@ proc initSchema*(db: DbConn) =
   """ & EmbeddingColumn & """ BLOB NOT NULL,
   doc_id TEXT NOT NULL,
   kind TEXT NOT NULL CHECK (kind IN ('source', 'derived')),
-  page INTEGER,
+  page INTEGER NOT NULL,
   label TEXT NOT NULL,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );"""
@@ -121,9 +121,6 @@ proc rowCount*(db: DbConn): int =
   result = parseInt(db.getValue(sql("SELECT COUNT(*) FROM " & TableName & ";")))
 
 proc readSearchResult(row: InstantRow): SearchResult =
-  let page =
-    if sqlite3.column_type(row, 7) == SQLITE_NULL: NoPageFilter
-    else: sqlite3.column_int(row, 7).int
   result = SearchResult(
     id: sqlite3.column_int64(row, 0),
     distance: sqlite3.column_double(row, 1).float,
@@ -133,7 +130,7 @@ proc readSearchResult(row: InstantRow): SearchResult =
     metadata: ChunkMetadata(
       docId: row.textColumn(5),
       kind: parseChunkKind(row.textColumn(6)),
-      page: page,
+      page: sqlite3.column_int(row, 7).int,
       label: row.textColumn(8)
     )
   )

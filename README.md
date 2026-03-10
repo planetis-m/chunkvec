@@ -12,7 +12,7 @@ queries locally from that database.
 - input is one marked-up text file, output is one SQLite database
 - chunk order is preserved with explicit `ordinal` values
 - `cvstore` applies one `doc` and one `kind` to the whole ingest run
-- each chunk still carries its own optional `page` and optional `label`
+- each chunk still carries its own optional `page` and `label`
 - ingest does bounded in-flight embedding work with retry handling
 - search embeds one raw `QUERY` string, then does nearest-neighbor lookup
   locally through `sqlite-vector`
