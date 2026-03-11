@@ -64,13 +64,11 @@ sudo apt-get update
 sudo apt-get install -y libcurl4-openssl-dev sqlite3
 nimble install -y "https://github.com/nim-lang/atlas@#head"
 atlas install
-export SQLITE_VECTOR_VERSION=0.9.92
+export SQLITE_VECTOR_VERSION=0.9.93
 curl -fL \
   "https://github.com/sqliteai/sqlite-vector/releases/download/${SQLITE_VECTOR_VERSION}/vector-linux-x86_64-${SQLITE_VECTOR_VERSION}.tar.gz" \
   -o vector-linux-x86_64.tar.gz
-mkdir -p sqlite-vector-download
-tar -xf vector-linux-x86_64.tar.gz -C sqlite-vector-download
-cp "$(find sqlite-vector-download -type f -name 'vector.so' | head -n 1)" vector.so
+tar -xf vector-linux-x86_64.tar.gz ./vector.so
 nim c -d:release -o:cvstore src/cvstore.nim
 nim c -d:release -o:cvquery src/cvquery.nim
 ```
@@ -84,13 +82,11 @@ nim c -d:release -o:cvquery src/cvquery.nim
 brew install curl sqlite
 nimble install -y "https://github.com/nim-lang/atlas@#head"
 atlas install
-export SQLITE_VECTOR_VERSION=0.9.92
+export SQLITE_VECTOR_VERSION=0.9.93
 curl -fL \
   "https://github.com/sqliteai/sqlite-vector/releases/download/${SQLITE_VECTOR_VERSION}/vector-macos-${SQLITE_VECTOR_VERSION}.tar.gz" \
   -o vector-macos.tar.gz
-mkdir -p sqlite-vector-download
-tar -xf vector-macos.tar.gz -C sqlite-vector-download
-cp "$(find sqlite-vector-download -type f -name 'vector.dylib' | head -n 1)" vector.dylib
+tar -xf vector-macos.tar.gz ./vector.dylib
 nim c -d:release -o:cvstore src/cvstore.nim
 nim c -d:release -o:cvquery src/cvquery.nim
 ```
@@ -103,15 +99,12 @@ nim c -d:release -o:cvquery src/cvquery.nim
 ```powershell
 nimble install -y "https://github.com/nim-lang/atlas@#head"
 atlas install
-$env:SQLITE_VECTOR_VERSION = "0.9.92"
+$env:SQLITE_VECTOR_VERSION = "0.9.93"
 curl.exe -fL `
   "https://github.com/sqliteai/sqlite-vector/releases/download/$env:SQLITE_VECTOR_VERSION/vector-windows-x86_64-$env:SQLITE_VECTOR_VERSION.zip" `
   -o vector-windows-x86_64.zip
 Expand-Archive -Path vector-windows-x86_64.zip -DestinationPath sqlite-vector-download -Force
-$candidate = Get-ChildItem -Path sqlite-vector-download -Recurse -Filter vector.dll |
-  Select-Object -First 1
-if ($null -eq $candidate) { throw "vector.dll not found in archive" }
-Copy-Item $candidate.FullName (Join-Path $pwd "vector.dll") -Force
+Copy-Item .\sqlite-vector-download\vector.dll .\vector.dll -Force
 # Install curl/sqlite3 as in CI, for example via vcpkg:
 #   vcpkg install curl[http2,ssl,c-ares] sqlite3 --triplet x64-windows-release
 #   $env:VCPKG_ROOT = "$pwd\vcpkg\installed\x64-windows-release"
