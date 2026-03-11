@@ -33,7 +33,7 @@ Options:
   --doc=DOC        Ingest doc id for cvstore; exact-match doc filter for cvquery.
   --kind=KIND      Ingest kind for cvstore; exact-match kind filter for cvquery.
   --source=PATH    Optional stored chunk source for cvstore.
-  --page=N         Exact-match query filter for integer page.
+  --page=N         Exact-match query filter for integer page; requires --doc.
   --label=TEXT     Substring query filter for chunk label.
   --help, -h       Show this help and exit.
 """
@@ -148,6 +148,8 @@ proc parseCliArgs(cliArgs: seq[string]): CliArgs =
     cliError("missing required INPUT.txt/QUERY argument")
   if result.dbPath.len == 0:
     cliError("missing required DB.sqlite argument")
+  if result.searchFilters.page != NoPageFilter and result.searchFilters.docId.len == 0:
+    cliError("--page requires --doc")
 
 proc buildRuntimeConfig*(cliArgs: seq[string]): RuntimeConfig =
   let parsed = parseCliArgs(cliArgs)

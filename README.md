@@ -147,6 +147,7 @@ Built-in defaults:
 
 - `cvstore` requires `--doc` and `--kind` for the whole ingest run
 - `cvquery` takes a raw `QUERY` string, not a query file
+- `cvquery --page` requires `--doc`
 - `stdout` is used only for search results
 - logs and fatal errors go to `stderr`
 
@@ -234,7 +235,7 @@ Search filter rules:
 
 - `doc` is an exact match filter on the logical document id
 - `kind` is an exact match filter on `source` or `derived`
-- `page` is an exact integer filter
+- `page` is an exact integer filter and requires `doc`
 - `label` is a substring filter after `strutils.normalize` on both sides
 - `strutils.normalize` lowercases ASCII and removes `_`
 - if multiple CLI filters are present, all must match
