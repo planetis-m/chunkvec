@@ -10,7 +10,6 @@ proc shutdownRelay(client: Relay; shouldAbort: bool) =
 
 proc renderResult(row: SearchResult; rank: int) =
   var header = $rank & ". distance=" & formatFloat(row.distance, ffDecimal, 6) &
-    " ordinal=" & $row.ordinal &
     " doc=\"" & row.metadata.docId & "\"" &
     " kind=" & $row.metadata.kind
   if row.metadata.page != NoPageFilter:

@@ -42,7 +42,6 @@ type
     sqliteConfig*: SqliteConfig
 
   InputChunk* = object
-    ordinal*: int
     text*: string
     page*: int
     label*: string
@@ -63,7 +62,6 @@ type
     id*: int64
     distance*: float
     source*: string
-    ordinal*: int
     text*: string
     metadata*: ChunkMetadata
 

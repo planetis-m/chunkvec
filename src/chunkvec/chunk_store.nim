@@ -62,7 +62,6 @@ proc initSchema*(db: DbConn) =
     """CREATE TABLE IF NOT EXISTS """ & TableName & """ (
   id INTEGER PRIMARY KEY,
   source TEXT NOT NULL,
-  ordinal INTEGER NOT NULL,
   text TEXT NOT NULL,
   """ & EmbeddingColumn & """ BLOB NOT NULL,
   doc_id TEXT NOT NULL,
@@ -71,10 +70,6 @@ proc initSchema*(db: DbConn) =
   label TEXT NOT NULL,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );"""
-  ))
-  db.exec(sql(
-    """CREATE INDEX IF NOT EXISTS idx_chunks_source_ordinal
-  ON """ & TableName & """(source, ordinal);"""
   ))
   db.exec(sql(
     """CREATE INDEX IF NOT EXISTS idx_chunks_doc_kind_page
@@ -101,14 +96,13 @@ proc prepareInsertStatement*(db: DbConn): SqlPrepared =
   result = db.prepare(
     """INSERT INTO """ & TableName & """(
   source,
-  ordinal,
   text,
   """ & EmbeddingColumn & """,
   doc_id,
   kind,
   page,
   label
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+) VALUES (?, ?, ?, ?, ?, ?, ?);
 """
   )
 
@@ -125,13 +119,12 @@ proc readSearchResult(row: InstantRow): SearchResult =
     id: sqlite3.column_int64(row, 0),
     distance: sqlite3.column_double(row, 1).float,
     source: row.textColumn(2),
-    ordinal: sqlite3.column_int(row, 3).int,
-    text: row.textColumn(4),
+    text: row.textColumn(3),
     metadata: ChunkMetadata(
-      docId: row.textColumn(5),
-      kind: parseChunkKind(row.textColumn(6)),
-      page: sqlite3.column_int(row, 7).int,
-      label: row.textColumn(8)
+      docId: row.textColumn(4),
+      kind: parseChunkKind(row.textColumn(5)),
+      page: sqlite3.column_int(row, 6).int,
+      label: row.textColumn(7)
     )
   )
 
@@ -141,7 +134,6 @@ proc runTopKSearch(db: DbConn; queryVector: seq[float32]; topK: int): seq[Search
   c.id,
   v.distance,
   c.source,
-  c.ordinal,
   c.text,
   c.doc_id,
   c.kind,
@@ -183,7 +175,6 @@ proc runFilteredSearch(db: DbConn; queryVector: seq[float32]; filters: SearchFil
   c.id,
   v.distance,
   c.source,
-  c.ordinal,
   c.text,
   c.doc_id,
   c.kind,

@@ -120,7 +120,6 @@ proc trimChunkBounds(text: string; startPos, endPos: int): Slice[int] =
 
 proc parseChunkMarker(text: string; chunk: var InputChunk; startPos: int): int =
   chunk = InputChunk(
-    ordinal: 0,
     text: "",
     page: NoPageFilter,
     label: ""
@@ -134,7 +133,6 @@ proc parseChunkMarker(text: string; chunk: var InputChunk; startPos: int): int =
 
 proc parseInputChunks*(text: string): seq[InputChunk] =
   var pos = skipWhitespace(text)
-  var ordinal = 1
 
   while pos < text.len:
     if not markerAtLineStart(text, pos, ChunkMarkerPrefix):
@@ -151,12 +149,10 @@ proc parseInputChunks*(text: string): seq[InputChunk] =
     if bodyBounds.a >= bodyBounds.b:
       failParse("chunk body is empty")
 
-    chunk.ordinal = ordinal
     chunk.text = text[bodyBounds]
     result.add(chunk)
 
     pos = nextMarkerPos
-    inc ordinal
 
 proc loadInputChunks*(path: string): seq[InputChunk] =
   result = parseInputChunks(readFile(path))

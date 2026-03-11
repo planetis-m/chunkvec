@@ -1,6 +1,6 @@
 # chunkvec
 
-Ordered embedding ingest and local search for marked-up text files.
+Embedding ingest and local search for marked-up text files.
 
 `chunkvec` reads text that already contains chunk boundaries via `<chunk ...>`
 markers, sends those chunks to DeepInfra's OpenAI-compatible embeddings API,
@@ -10,7 +10,6 @@ queries locally from that database.
 ## Core guarantees
 
 - input is one marked-up text file, output is one SQLite database
-- chunk order is preserved with explicit `ordinal` values
 - `cvstore` applies one `doc` and one `kind` to the whole ingest run
 - each chunk still carries its own optional `page` and `label`
 - ingest does bounded in-flight embedding work with retry handling
@@ -26,7 +25,7 @@ queries locally from that database.
 - parses required leading `<chunk ...>` markers
 - requires `--doc` and `--kind` and stores those values on every inserted row
 - sends embedding requests with bounded in-flight work and retries
-- inserts successful chunks into SQLite in original order
+- inserts successful chunks into SQLite
 - initializes and quantizes the `sqlite-vector` column
 
 2. `cvquery`:
@@ -244,10 +243,10 @@ Search filter rules:
 Typical output:
 
 ```text
-1. distance=0.123456 source=course/notes.md ordinal=1 doc="notes-course" kind=source page=4 label="Embeddings"
+1. distance=0.123456 source=course/notes.md doc="notes-course" kind=source page=4 label="Embeddings"
 Embeddings map text into vectors where similar meanings stay close.
 
-2. distance=0.187654 source=course/notes.md ordinal=2 doc="notes-course" kind=source page=5 label="Vector Search"
+2. distance=0.187654 source=course/notes.md doc="notes-course" kind=source page=5 label="Vector Search"
 Nearest-neighbor search compares a query vector against stored vectors.
 ```
 

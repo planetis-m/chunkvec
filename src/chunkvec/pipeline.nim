@@ -36,7 +36,6 @@ proc insertRecord(db: DbConn; insertStmt: SqlPrepared; record: sink ChunkRecord;
   db.exec(
     insertStmt,
     cfg.sourcePath,
-    record.chunk.ordinal,
     record.chunk.text,
     record.embedding,
     cfg.searchFilters.docId,

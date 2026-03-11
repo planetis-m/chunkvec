@@ -1,4 +1,4 @@
-import std/os
+import std/[os, strutils]
 import ../src/chunkvec/[chunk_store, constants, sqlite_vector_paths, types]
 
 proc unitVector(index: int): seq[float32] =
@@ -9,6 +9,7 @@ proc testSqliteVectorRoundTrip() =
   let repoRoot = getCurrentDir()
   let dbPath = repoRoot / "test_files" / "vector_test.sqlite"
   let extPath = repoRoot / ExtensionFilename
+  createDir(parentDir(dbPath))
   if fileExists(dbPath):
     removeFile(dbPath)
 
@@ -21,6 +22,9 @@ proc testSqliteVectorRoundTrip() =
   db.loadExtension(extPath)
   db.initSchema()
   db.initializeVectorTable(EmbeddingDimension)
+  doAssert parseInt(
+    db.getValue(sql"SELECT COUNT(*) FROM pragma_table_info('chunks') WHERE name = 'ordinal';")
+  ) == 0
 
   var stmt = db.prepareInsertStatement()
   defer: stmt.finalize()
@@ -29,7 +33,6 @@ proc testSqliteVectorRoundTrip() =
   db.exec(
     stmt,
     "notes.txt",
-    1,
     "alpha",
     unitVector(0),
     "ml-unit-1",
@@ -40,7 +43,6 @@ proc testSqliteVectorRoundTrip() =
   db.exec(
     stmt,
     "notes.txt",
-    2,
     "beta",
     unitVector(1),
     "ml-unit-1",
@@ -51,7 +53,6 @@ proc testSqliteVectorRoundTrip() =
   db.exec(
     stmt,
     "notes.txt",
-    3,
     "gamma",
     unitVector(0),
     "ml-unit-2",

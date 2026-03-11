@@ -6,7 +6,6 @@ proc testPageMarkerChunk() =
 Hello
 world""")
   doAssert chunks.len == 1
-  doAssert chunks[0].ordinal == 1
   doAssert chunks[0].page == 12
   doAssert chunks[0].label == "Intro"
   doAssert chunks[0].text == "Hello\nworld"
