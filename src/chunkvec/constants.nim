@@ -2,6 +2,8 @@ import openai/embeddings
 
 const
   DefaultConfigPath* = "config.json"
+  AppDataDirName* = "chunkvec"
+  DatabaseFilename* = "db.sqlite"
 
   ApiUrl* = "https://api.deepinfra.com/v1/openai/embeddings"
   Model* = "Qwen/Qwen3-Embedding-0.6B"

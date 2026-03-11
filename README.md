@@ -139,8 +139,8 @@ Built-in defaults:
 ## CLI
 
 ```bash
-./cvstore --doc=DOC --kind=source|derived [--source=RELATIVEPATH] INPUT.txt DB.sqlite
-./cvquery [--doc=DOC] [--kind=source|derived] [--page=N] [--label=TEXT] QUERY DB.sqlite
+./cvstore --doc=DOC --kind=source|derived [--source=RELATIVEPATH] INPUT.txt
+./cvquery [--doc=DOC] [--kind=source|derived] [--page=N] [--label=TEXT] QUERY
 ./cvstore --help
 ./cvquery --help
 ```
@@ -222,13 +222,13 @@ export DEEPINFRA_API_KEY=...
 Ingest:
 
 ```bash
-./cvstore --doc=notes-course --kind=source --source=course/notes.md notes.txt notes.sqlite
+./cvstore --doc=notes-course --kind=source --source=course/notes.md notes.txt
 ```
 
 Search:
 
 ```bash
-./cvquery --doc=notes-course --kind=source --page=5 --label=vector_search "How do embeddings help search?" notes.sqlite
+./cvquery --doc=notes-course --kind=source --page=5 --label=vector_search "How do embeddings help search?"
 ```
 
 Search filter rules:

@@ -1,16 +1,23 @@
-import ../src/chunkvec/runtime_config
-import ../src/chunkvec/types
+import std/[appdirs, paths]
+from std/dirs import dirExists
+import ../src/chunkvec/[constants, runtime_config, types]
+
+proc expectedDbPath(): string =
+  result = $(
+    getDataDir() / Path(AppDataDirName) / lastPathPart(getCurrentDir()) /
+    Path(DatabaseFilename)
+  )
 
 proc testParseStoreArgs() =
   let cfg = buildRuntimeConfig(@[
     "--doc=chapter1-source",
     "--kind=source",
     "--source=course/week-1-notes.md",
-    "input.txt",
-    "db.sqlite"
+    "input.txt"
   ])
   doAssert cfg.inputPath == "input.txt"
-  doAssert cfg.dbPath == "db.sqlite"
+  doAssert cfg.dbPath == expectedDbPath()
+  doAssert dirExists(parentDir(Path(cfg.dbPath)))
   doAssert cfg.sourcePath == "course/week-1-notes.md"
   doAssert cfg.searchFilters.docId == "chapter1-source"
   doAssert cfg.searchFilters.kind == source
@@ -21,11 +28,10 @@ proc testParseQueryFilters() =
     "--kind=source",
     "--page=12",
     "--label=regularization",
-    "query.txt",
-    "db.sqlite"
+    "query.txt"
   ])
   doAssert cfg.inputPath == "query.txt"
-  doAssert cfg.dbPath == "db.sqlite"
+  doAssert cfg.dbPath == expectedDbPath()
   doAssert cfg.searchFilters == SearchFilters(
     docId: "chapter1-source",
     kind: source,
@@ -37,11 +43,10 @@ proc testParseStoreWithoutSourcePath() =
   let cfg = buildRuntimeConfig(@[
     "--doc=chapter1-notes",
     "--kind=derived",
-    "input.txt",
-    "db.sqlite"
+    "input.txt"
   ])
   doAssert cfg.inputPath == "input.txt"
-  doAssert cfg.dbPath == "db.sqlite"
+  doAssert cfg.dbPath == expectedDbPath()
   doAssert cfg.sourcePath.len == 0
   doAssert cfg.searchFilters == SearchFilters(
     docId: "chapter1-notes",

@@ -1,4 +1,5 @@
-import std/[envvars, files, parseopt, paths, strutils]
+import std/[appdirs, envvars, files, parseopt, paths, strutils]
+from std/dirs import createDir
 from std/os import getAppDir
 import jsonx
 import openai/core
@@ -10,7 +11,6 @@ import ./sqlite_vector_paths
 type
   CliArgs = object
     inputPath: string
-    dbPath: string
     sourcePath: string
     searchFilters: SearchFilters
 
@@ -26,8 +26,8 @@ type
 
 const HelpText = """
 Usage:
-  cvstore --doc=DOC --kind=source|derived [--source=RELATIVEPATH] INPUT.txt DB.sqlite
-  cvquery [--doc=DOC] [--kind=source|derived] [--page=N] [--label=TEXT] QUERY DB.sqlite
+  cvstore --doc=DOC --kind=source|derived [--source=RELATIVEPATH] INPUT.txt
+  cvquery [--doc=DOC] [--kind=source|derived] [--page=N] [--label=TEXT] QUERY
 
 Options:
   --doc=DOC        Ingest doc id for cvstore; exact-match doc filter for cvquery.
@@ -90,10 +90,14 @@ proc parseSearchFilterPage(val: string): int =
   except ValueError:
     cliError("invalid value for --page: " & val)
 
+proc resolveDbPath(): Path =
+  let dbDir = getDataDir() / Path(AppDataDirName) / lastPathPart(getCurrentDir())
+  createDir(dbDir)
+  result = dbDir / Path(DatabaseFilename)
+
 proc parseCliArgs(cliArgs: seq[string]): CliArgs =
   result = CliArgs(
     inputPath: "",
-    dbPath: "",
     sourcePath: "",
     searchFilters: SearchFilters()
   )
@@ -104,8 +108,6 @@ proc parseCliArgs(cliArgs: seq[string]): CliArgs =
     of cmdArgument:
       if result.inputPath.len == 0:
         result.inputPath = parser.key
-      elif result.dbPath.len == 0:
-        result.dbPath = parser.key
       else:
         cliError("too many positional arguments")
     of cmdLongOption:
@@ -146,9 +148,8 @@ proc parseCliArgs(cliArgs: seq[string]): CliArgs =
 
   if result.inputPath.len == 0:
     cliError("missing required INPUT.txt/QUERY argument")
-  if result.dbPath.len == 0:
-    cliError("missing required DB.sqlite argument")
-  if result.searchFilters.page != NoPageFilter and result.searchFilters.docId.len == 0:
+  if result.searchFilters.page != NoPageFilter and
+      result.searchFilters.docId.len == 0:
     cliError("--page requires --doc")
 
 proc buildRuntimeConfig*(cliArgs: seq[string]): RuntimeConfig =
@@ -160,7 +161,7 @@ proc buildRuntimeConfig*(cliArgs: seq[string]): RuntimeConfig =
 
   result = RuntimeConfig(
     inputPath: parsed.inputPath,
-    dbPath: parsed.dbPath,
+    dbPath: $resolveDbPath(),
     sourcePath: parsed.sourcePath,
     searchFilters: parsed.searchFilters,
     model: ifNonEmpty(rawConfig.model, Model),
