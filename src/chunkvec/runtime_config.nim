@@ -90,8 +90,12 @@ proc parseSearchFilterPage(val: string): int =
   except ValueError:
     cliError("invalid value for --page: " & val)
 
+proc workspaceDirName(workspacePath: Path): Path =
+  let workspaceHash = toHex(int(hash(workspacePath)))
+  result = Path($lastPathPart(workspacePath) & workspaceHash)
+
 proc resolveDbPath(): Path =
-  let dbDir = getDataDir() / Path(AppDataDirName) / lastPathPart(getCurrentDir())
+  let dbDir = getDataDir() / Path(AppDataDirName) / workspaceDirName(getCurrentDir())
   createDir(dbDir)
   result = dbDir / Path(DatabaseFilename)
 

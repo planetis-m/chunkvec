@@ -165,11 +165,9 @@ proc waitForProgress(cfg: RuntimeConfig; chunks: seq[InputChunk]; client: Relay;
   else:
     let nextRetryMs = nextRetryDelayMs(state.retryQueue)
     if nextRetryMs < 0:
-      waitForSingleResult(cfg, chunks, client, maxAttempts, retryPolicy, db, insertStmt,
-        state)
+      waitForSingleResult(cfg, chunks, client, maxAttempts, retryPolicy, db, insertStmt, state)
     elif nextRetryMs == 0 and state.inFlightCount == maxInFlight:
-      waitForSingleResult(cfg, chunks, client, maxAttempts, retryPolicy, db, insertStmt,
-        state)
+      waitForSingleResult(cfg, chunks, client, maxAttempts, retryPolicy, db, insertStmt, state)
     elif nextRetryMs > 0:
       sleep(min(RetryPollSliceMs, nextRetryMs))
 

@@ -1,10 +1,13 @@
-import std/[appdirs, paths]
+import std/[appdirs, paths, strutils]
 from std/dirs import dirExists
 import ../src/chunkvec/[constants, runtime_config, types]
 
 proc expectedDbPath(): string =
+  let workspacePath = getCurrentDir()
+  let workspaceHash = toHex(int(hash(workspacePath)))
   result = $(
-    getDataDir() / Path(AppDataDirName) / lastPathPart(getCurrentDir()) /
+    getDataDir() / Path(AppDataDirName) /
+    Path($lastPathPart(workspacePath) & workspaceHash) /
     Path(DatabaseFilename)
   )
 
