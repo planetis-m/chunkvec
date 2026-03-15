@@ -8,6 +8,16 @@ proc unitVector(index: int): seq[float32] =
 proc storedChunk(text: string; page: int; label: string): InputChunk =
   InputChunk(text: text, page: page, label: label)
 
+proc containsChunk(chunks: seq[InputChunk]; expected: InputChunk): bool =
+  for chunk in chunks:
+    if chunk == expected:
+      return true
+
+proc assertSameChunks(actual, expected: seq[InputChunk]) =
+  doAssert actual.len == expected.len
+  for chunk in expected:
+    doAssert actual.containsChunk(chunk)
+
 proc testSqliteVectorRoundTrip() =
   let repoRoot = getCurrentDir()
   let dbPath = repoRoot / "test_files" / "vector_test.sqlite"
@@ -103,28 +113,50 @@ proc testSqliteVectorRoundTrip() =
   doAssert combinedRows.len == 1
   doAssert combinedRows[0].text == "gamma"
 
-  let selected = db.selectMissingChunks("notes.txt", "ml-unit-1", source, @[
+  var selectedChunks = @[
     storedChunk("alpha", 7, "Intro_Basics"),
     storedChunk("alpha revised", 7, "Intro_Basics"),
     storedChunk("alpha", 9, "Intro_Basics")
-  ])
-  doAssert selected.skipped == 1
-  doAssert selected.missing == @[
+  ]
+  let selectedSkipped = db.selectMissingChunks("notes.txt", "ml-unit-1", source, selectedChunks)
+  doAssert selectedSkipped == 1
+  assertSameChunks(selectedChunks, @[
     storedChunk("alpha revised", 7, "Intro_Basics"),
     storedChunk("alpha", 9, "Intro_Basics")
+  ])
+
+  var allSkippedChunks = @[
+    storedChunk("alpha", 7, "Intro_Basics")
   ]
+  let allSkipped = db.selectMissingChunks("notes.txt", "ml-unit-1", source, allSkippedChunks)
+  doAssert allSkipped == 1
+  doAssert allSkippedChunks.len == 0
 
-  let wrongKind = db.selectMissingChunks("notes.txt", "ml-unit-1", derived, @[
-    storedChunk("alpha", 7, "Intro_Basics")
+  var allMissingChunks = @[
+    storedChunk("delta", 10, "New_Topic"),
+    storedChunk("epsilon", 11, "Wrap_Up")
+  ]
+  let allMissing = db.selectMissingChunks("notes.txt", "ml-unit-1", source, allMissingChunks)
+  doAssert allMissing == 0
+  assertSameChunks(allMissingChunks, @[
+    storedChunk("delta", 10, "New_Topic"),
+    storedChunk("epsilon", 11, "Wrap_Up")
   ])
-  doAssert wrongKind.skipped == 0
-  doAssert wrongKind.missing == @[storedChunk("alpha", 7, "Intro_Basics")]
 
-  let wrongSource = db.selectMissingChunks("other-notes.txt", "ml-unit-1", source, @[
+  var wrongKindChunks = @[
     storedChunk("alpha", 7, "Intro_Basics")
-  ])
-  doAssert wrongSource.skipped == 0
-  doAssert wrongSource.missing == @[storedChunk("alpha", 7, "Intro_Basics")]
+  ]
+  let wrongKind = db.selectMissingChunks("notes.txt", "ml-unit-1", derived, wrongKindChunks)
+  doAssert wrongKind == 0
+  doAssert wrongKindChunks == @[storedChunk("alpha", 7, "Intro_Basics")]
+
+  var wrongSourceChunks = @[
+    storedChunk("alpha", 7, "Intro_Basics")
+  ]
+  let wrongSource = db.selectMissingChunks("other-notes.txt", "ml-unit-1", source,
+    wrongSourceChunks)
+  doAssert wrongSource == 0
+  doAssert wrongSourceChunks == @[storedChunk("alpha", 7, "Intro_Basics")]
 
 when isMainModule:
   testSqliteVectorRoundTrip()

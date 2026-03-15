@@ -13,6 +13,8 @@ queries locally from that database.
 - `cvstore` applies one `doc` and one `kind` to the whole ingest run
 - each chunk still carries its own optional `page` and `label`
 - ingest does bounded in-flight embedding work with retry handling
+- rerunning the same ingest skips chunks already stored with the same metadata
+  and text
 - search embeds one raw `QUERY` string, then does nearest-neighbor lookup
   locally through `sqlite-vector`
 
@@ -243,6 +245,11 @@ Ingest:
 ```bash
 ./cvstore --doc=notes-course --kind=source --source=course/notes.md notes.txt
 ```
+
+If an ingest stops partway through, rerun the same `cvstore` command.
+`chunkvec` skips chunks that are already stored and processes only the missing
+ones. This also works if you ingest one logical document in multiple files over
+time.
 
 Search:
 

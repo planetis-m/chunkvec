@@ -120,7 +120,7 @@ proc toResumeKey(chunk: InputChunk): ChunkResumeKey =
   )
 
 proc selectMissingChunks*(db: DbConn; sourcePath, docId: string; kind: ChunkKind;
-    chunks: seq[InputChunk]): tuple[missing: seq[InputChunk]; skipped: int] =
+    chunks: var seq[InputChunk]): int =
   var stmt: SqlPrepared
   var existing = initHashSet[ChunkResumeKey]()
   try:
@@ -148,11 +148,13 @@ WHERE source = ?
     if not stmt.isNil:
       stmt.finalize()
 
-  for chunk in chunks:
-    if existing.contains(chunk.toResumeKey()):
-      inc result.skipped
+  var i = 0
+  while i < chunks.len:
+    if existing.contains(chunks[i].toResumeKey()):
+      inc result
+      chunks.del(i)
     else:
-      result.missing.add(chunk)
+      inc i
 
 proc rebuildQuantization*(db: DbConn) =
   let options = "qtype=" & QuantizationType

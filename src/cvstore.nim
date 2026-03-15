@@ -27,7 +27,7 @@ proc runIngestApp*(): int =
     if cfg.searchFilters.kind == none:
       raise newException(ValueError, "missing required --kind")
 
-    let chunks = loadInputChunks(cfg.inputPath)
+    var chunks = loadInputChunks(cfg.inputPath)
     if chunks.len == 0:
       raise newException(ValueError, "input did not produce any non-empty chunks")
 
@@ -42,22 +42,22 @@ proc runIngestApp*(): int =
     var pipelineResult = (allSucceeded: true, wroteRows: false)
     db.beginTransaction()
     transactionOpen = true
-    let pending = db.selectMissingChunks(
+    let skipped = db.selectMissingChunks(
       cfg.sourcePath,
       cfg.searchFilters.docId,
       cfg.searchFilters.kind,
       chunks
     )
-    if pending.skipped > 0:
-      logInfo("resume: skipped " & $pending.skipped &
-        " already-ingested chunk(s); processing " & $pending.missing.len &
+    if skipped > 0:
+      logInfo("resume: skipped " & $skipped &
+        " already-ingested chunk(s); processing " & $chunks.len &
         " missing chunk(s)")
 
-    if pending.missing.len == 0:
+    if chunks.len == 0:
       logInfo("all requested chunks are already stored; nothing to do")
       result = ExitAllOk
     else:
-      logInfo("starting embedding pipeline for " & $pending.missing.len &
+      logInfo("starting embedding pipeline for " & $chunks.len &
         " missing chunk(s) from " & sourceName & ", please wait...")
       db.loadExtension(cfg.sqliteConfig.extensionPath)
       db.initializeVectorTable(cfg.embeddingDimension)
@@ -69,7 +69,7 @@ proc runIngestApp*(): int =
           defaultTimeoutMs = cfg.networkConfig.totalTimeoutMs
         )
 
-        pipelineResult = runPipeline(cfg, pending.missing, client, db, insertStmt)
+        pipelineResult = runPipeline(cfg, chunks, client, db, insertStmt)
       finally:
         insertStmt.finalize()
 
