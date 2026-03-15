@@ -64,7 +64,11 @@ proc runIngestApp*(): int =
     if pipelineResult.wroteRows:
       db.rebuildQuantization()
 
-    result = if pipelineResult.allSucceeded: ExitAllOk else: ExitPartialFailure
+    if pipelineResult.allSucceeded:
+      result = ExitAllOk
+    else:
+      logWarn("embedding pipeline completed with partial failures; some chunks were not stored")
+      result = ExitPartialFailure
   except CatchableError:
     logError(getCurrentExceptionMsg())
     shouldAbort = true
