@@ -34,41 +34,56 @@ proc runIngestApp*(): int =
     let sourceName =
       if cfg.sourcePath.len > 0: cfg.sourcePath
       else: cfg.inputPath
-    logInfo("starting embedding pipeline for " & $chunks.len & " chunk(s) from " &
-      sourceName & ", please wait...")
 
     db = openDatabase(cfg.dbPath)
     dbOpened = true
-    db.loadExtension(cfg.sqliteConfig.extensionPath)
     db.initSchema()
-    db.initializeVectorTable(cfg.embeddingDimension)
 
-    var insertStmt = db.prepareInsertStatement()
-    var pipelineResult: tuple[allSucceeded, wroteRows: bool]
-    try:
-      db.beginTransaction()
-      transactionOpen = true
+    var pipelineResult = (allSucceeded: true, wroteRows: false)
+    db.beginTransaction()
+    transactionOpen = true
+    let pending = db.selectMissingChunks(
+      cfg.sourcePath,
+      cfg.searchFilters.docId,
+      cfg.searchFilters.kind,
+      chunks
+    )
+    if pending.skipped > 0:
+      logInfo("resume: skipped " & $pending.skipped &
+        " already-ingested chunk(s); processing " & $pending.missing.len &
+        " missing chunk(s)")
 
-      client = newRelay(
-        maxInFlight = cfg.networkConfig.maxInflight,
-        defaultTimeoutMs = cfg.networkConfig.totalTimeoutMs
-      )
-
-      pipelineResult = runPipeline(cfg, chunks, client, db, insertStmt)
-
-      db.commitTransaction()
-      transactionOpen = false
-    finally:
-      insertStmt.finalize()
-
-    if pipelineResult.wroteRows:
-      db.rebuildQuantization()
-
-    if pipelineResult.allSucceeded:
+    if pending.missing.len == 0:
+      logInfo("all requested chunks are already stored; nothing to do")
       result = ExitAllOk
     else:
-      logWarn("embedding pipeline completed with partial failures; some chunks were not stored")
-      result = ExitPartialFailure
+      logInfo("starting embedding pipeline for " & $pending.missing.len &
+        " missing chunk(s) from " & sourceName & ", please wait...")
+      db.loadExtension(cfg.sqliteConfig.extensionPath)
+      db.initializeVectorTable(cfg.embeddingDimension)
+
+      var insertStmt = db.prepareInsertStatement()
+      try:
+        client = newRelay(
+          maxInFlight = cfg.networkConfig.maxInflight,
+          defaultTimeoutMs = cfg.networkConfig.totalTimeoutMs
+        )
+
+        pipelineResult = runPipeline(cfg, pending.missing, client, db, insertStmt)
+      finally:
+        insertStmt.finalize()
+
+      if pipelineResult.wroteRows:
+        db.rebuildQuantization()
+
+      if pipelineResult.allSucceeded:
+        result = ExitAllOk
+      else:
+        logWarn("embedding pipeline completed with partial failures; some chunks were not stored")
+        result = ExitPartialFailure
+
+    db.commitTransaction()
+    transactionOpen = false
   except CatchableError:
     logError(getCurrentExceptionMsg())
     shouldAbort = true

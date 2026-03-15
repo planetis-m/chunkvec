@@ -1,4 +1,4 @@
-import std/strutils
+import std/[hashes, sets, strutils]
 import db_connector/[db_sqlite, sqlite3]
 import ./[constants, types]
 
@@ -105,6 +105,54 @@ proc prepareInsertStatement*(db: DbConn): SqlPrepared =
 ) VALUES (?, ?, ?, ?, ?, ?, ?);
 """
   )
+
+type
+  ChunkResumeKey = object
+    page: int
+    label: string
+    text: string
+
+proc toResumeKey(chunk: InputChunk): ChunkResumeKey =
+  ChunkResumeKey(
+    page: chunk.page,
+    label: chunk.label,
+    text: chunk.text
+  )
+
+proc selectMissingChunks*(db: DbConn; sourcePath, docId: string; kind: ChunkKind;
+    chunks: seq[InputChunk]): tuple[missing: seq[InputChunk]; skipped: int] =
+  var stmt: SqlPrepared
+  var existing = initHashSet[ChunkResumeKey]()
+  try:
+    stmt = db.prepare(
+      """SELECT
+  page,
+  label,
+  text
+FROM """ & TableName & """
+WHERE source = ?
+  AND doc_id = ?
+  AND kind = ?;"""
+    )
+    stmt.bindParam(1, sourcePath)
+    stmt.bindParam(2, docId)
+    stmt.bindParam(3, $kind)
+
+    for row in db.instantRows(stmt):
+      existing.incl(ChunkResumeKey(
+        page: sqlite3.column_int(row, 0).int,
+        label: row.textColumn(1),
+        text: row.textColumn(2)
+      ))
+  finally:
+    if not stmt.isNil:
+      stmt.finalize()
+
+  for chunk in chunks:
+    if existing.contains(chunk.toResumeKey()):
+      inc result.skipped
+    else:
+      result.missing.add(chunk)
 
 proc rebuildQuantization*(db: DbConn) =
   let options = "qtype=" & QuantizationType

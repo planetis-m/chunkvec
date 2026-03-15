@@ -5,6 +5,9 @@ proc unitVector(index: int): seq[float32] =
   result = newSeq[float32](EmbeddingDimension)
   result[index] = 1.0'f32
 
+proc storedChunk(text: string; page: int; label: string): InputChunk =
+  InputChunk(text: text, page: page, label: label)
+
 proc testSqliteVectorRoundTrip() =
   let repoRoot = getCurrentDir()
   let dbPath = repoRoot / "test_files" / "vector_test.sqlite"
@@ -99,6 +102,29 @@ proc testSqliteVectorRoundTrip() =
     ))
   doAssert combinedRows.len == 1
   doAssert combinedRows[0].text == "gamma"
+
+  let selected = db.selectMissingChunks("notes.txt", "ml-unit-1", source, @[
+    storedChunk("alpha", 7, "Intro_Basics"),
+    storedChunk("alpha revised", 7, "Intro_Basics"),
+    storedChunk("alpha", 9, "Intro_Basics")
+  ])
+  doAssert selected.skipped == 1
+  doAssert selected.missing == @[
+    storedChunk("alpha revised", 7, "Intro_Basics"),
+    storedChunk("alpha", 9, "Intro_Basics")
+  ]
+
+  let wrongKind = db.selectMissingChunks("notes.txt", "ml-unit-1", derived, @[
+    storedChunk("alpha", 7, "Intro_Basics")
+  ])
+  doAssert wrongKind.skipped == 0
+  doAssert wrongKind.missing == @[storedChunk("alpha", 7, "Intro_Basics")]
+
+  let wrongSource = db.selectMissingChunks("other-notes.txt", "ml-unit-1", source, @[
+    storedChunk("alpha", 7, "Intro_Basics")
+  ])
+  doAssert wrongSource.skipped == 0
+  doAssert wrongSource.missing == @[storedChunk("alpha", 7, "Intro_Basics")]
 
 when isMainModule:
   testSqliteVectorRoundTrip()
