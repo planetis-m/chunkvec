@@ -106,23 +106,10 @@ proc prepareInsertStatement*(db: DbConn): SqlPrepared =
 """
   )
 
-type
-  ChunkResumeKey = object
-    page: int
-    label: string
-    text: string
-
-proc toResumeKey(chunk: InputChunk): ChunkResumeKey =
-  ChunkResumeKey(
-    page: chunk.page,
-    label: chunk.label,
-    text: chunk.text
-  )
-
 proc selectMissingChunks*(db: DbConn; sourcePath, docId: string; kind: ChunkKind;
     chunks: var seq[InputChunk]): int =
   var stmt: SqlPrepared
-  var existing = initHashSet[ChunkResumeKey]()
+  var existing = initHashSet[InputChunk]()
   try:
     stmt = db.prepare(
       """SELECT
@@ -139,7 +126,7 @@ WHERE source = ?
     stmt.bindParam(3, $kind)
 
     for row in db.instantRows(stmt):
-      existing.incl(ChunkResumeKey(
+      existing.incl(InputChunk(
         page: sqlite3.column_int(row, 0).int,
         label: row.textColumn(1),
         text: row.textColumn(2)
@@ -150,7 +137,7 @@ WHERE source = ?
 
   var i = 0
   while i < chunks.len:
-    if existing.contains(chunks[i].toResumeKey()):
+    if existing.contains(chunks[i]):
       inc result
       chunks.del(i)
     else:
