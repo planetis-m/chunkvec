@@ -117,6 +117,7 @@ proc selectMissingChunks*(db: DbConn; sourcePath, docId: string; kind: ChunkKind
   label,
   text
 FROM """ & TableName & """
+
 WHERE source = ?
   AND doc_id = ?
   AND kind = ?;"""
@@ -177,7 +178,7 @@ proc runTopKSearch(db: DbConn; queryVector: seq[float32]; topK: int): seq[Search
   c.page,
   c.label
 FROM """ & TableName & """ AS c
-JOIN vector_quantize_scan('""" & TableName & """', '""" &
+JOIN vector_quantize_scan('""" & TableName & "', '" &
     EmbeddingColumn & """', ?, ?) AS v
   ON c.id = v.rowid
 ORDER BY v.distance ASC, c.id ASC;
@@ -218,7 +219,7 @@ proc runFilteredSearch(db: DbConn; queryVector: seq[float32]; filters: SearchFil
   c.page,
   c.label
 FROM """ & TableName & """ AS c
-JOIN vector_quantize_scan('""" & TableName & """', '""" &
+JOIN vector_quantize_scan('""" & TableName & "', '" &
     EmbeddingColumn & """', ?) AS v
   ON c.id = v.rowid
 """

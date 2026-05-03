@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 env:
-  SQLITE_VECTOR_VERSION: 0.9.93
+  SQLITE_VECTOR_VERSION: 0.9.95
 
 jobs:
   linux:

@@ -10,7 +10,7 @@ permissions:
 
 env:
   VERSION: ${{ github.ref_name }}
-  SQLITE_VECTOR_VERSION: 0.9.93
+  SQLITE_VECTOR_VERSION: 0.9.95
 
 jobs:
   build-linux:
